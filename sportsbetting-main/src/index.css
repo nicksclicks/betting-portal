@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-white antialiased;
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@layer components {
+  .input-field {
+    @apply w-full px-4 py-3 bg-black border border-neutral-800 rounded-lg text-white
+           placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-lime-400
+           focus:border-lime-400 transition-all;
+  }
+
+  .select-field {
+    @apply w-full px-4 py-3 bg-black border border-neutral-800 rounded-lg text-white
+           focus:outline-none focus:ring-1 focus:ring-lime-400 focus:border-lime-400
+           transition-all cursor-pointer appearance-none;
+  }
+
+  .btn-primary {
+    @apply px-5 py-2.5 bg-white hover:bg-neutral-200 text-black font-medium rounded-lg
+           transition-colors focus:outline-none focus:ring-2 focus:ring-white
+           focus:ring-offset-2 focus:ring-offset-black;
+  }
+
+  .btn-secondary {
+    @apply px-5 py-2.5 bg-transparent border border-neutral-700 hover:border-neutral-500
+           text-white font-medium rounded-lg transition-colors focus:outline-none
+           focus:ring-1 focus:ring-neutral-500;
+  }
+
+  .btn-danger {
+    @apply px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg
+           transition-colors focus:outline-none focus:ring-2 focus:ring-red-500
+           focus:ring-offset-2 focus:ring-offset-black;
+  }
+
+  .card {
+    @apply bg-neutral-950 rounded-xl border border-neutral-800 p-6;
+  }
+
+  .card-header {
+    @apply text-lg font-semibold text-white mb-4;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-neutral-400 mb-2;
+  }
+
+  .odds-cell {
+    @apply px-3 py-2 text-center cursor-pointer rounded transition-colors
+           hover:bg-neutral-800 text-sm font-medium;
+  }
+
+  .odds-positive {
+    @apply text-lime-400;
+  }
+
+  .odds-negative {
+    @apply text-amber-400;
+  }
+
+  .status-active {
+    @apply px-3 py-1 text-xs font-medium rounded-full bg-lime-500/10 text-lime-400 border border-lime-500/20;
+  }
+
+  .status-completed {
+    @apply px-3 py-1 text-xs font-medium rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20;
+  }
+
+  .status-withdrawn {
+    @apply px-3 py-1 text-xs font-medium rounded-full bg-neutral-500/10 text-neutral-400 border border-neutral-500/20;
+  }
+
+  .feature-icon {
+    @apply w-12 h-12 rounded-full border border-lime-500/30 flex items-center justify-center text-lime-400;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-black;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-600;
+}
