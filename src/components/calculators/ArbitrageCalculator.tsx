@@ -197,7 +197,7 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
         {result && (
           <div className="card mt-4 md:mt-6">
             <h3 className="text-base md:text-lg font-semibold text-white mb-4 md:mb-6">Results</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <div className="p-3 md:p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
                 <p className="text-neutral-500 text-xs md:text-sm mb-1 truncate">{teamA || 'Side A Bet'}</p>
                 <p className="text-white text-lg md:text-xl font-semibold font-mono">{formatCurrency(result.betA)}</p>

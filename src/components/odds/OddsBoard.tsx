@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Activity, RefreshCw, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { SPORTS, MARKET_TYPES, ALL_SPORTSBOOKS, Sport, MarketType, Sportsbook } from '../../constants/sportsbooks';
-import { GameOdds } from '../../data/mockOdds';
+import { GameOdds, getMockOddsApiPayload } from '../../data/mockOdds';
+import { isLocalMockMode } from '../../lib/supabase';
+import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
 import { calculateGameBestPercent, BestPercentResult } from '../../utils/bestPercent';
 
@@ -82,6 +84,14 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const fetchOdds = useCallback(async () => {
     setLoading(true);
     try {
+      if (isLocalMockMode) {
+        const data = getMockOddsApiPayload();
+        const transformedGames = transformApiGames(data.games);
+        setGames(transformedGames);
+        setLastUpdated(new Date(data.updated));
+        return;
+      }
+
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-odds`;
       const response = await fetch(apiUrl, {
         headers: {
@@ -209,21 +219,23 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center gap-3 md:gap-4 mb-4 md:mb-6">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`btn-secondary text-sm ${showFilters ? 'border-lime-500/50 text-lime-400' : ''}`}
-          >
-            Filters
-          </button>
-          <button
-            onClick={fetchOdds}
-            disabled={loading}
-            className={`btn-secondary text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
-          <p className="text-xs md:text-sm text-neutral-500 w-full md:w-auto mt-1 md:mt-0">
+        <div className="flex flex-col items-center gap-2 md:gap-3 mb-4 md:mb-6">
+          <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`btn-secondary text-sm ${showFilters ? 'border-lime-500/50 text-lime-400' : ''}`}
+            >
+              Filters
+            </button>
+            <button
+              onClick={fetchOdds}
+              disabled={loading}
+              className={`btn-secondary text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+          <p className="text-xs md:text-sm text-neutral-500 text-center px-2">
             {lastUpdated
               ? `Updated: ${lastUpdated.toLocaleTimeString()}`
               : 'Tap odds to fill calculator'}
@@ -343,44 +355,45 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
         )}
 
         <div className="card overflow-hidden p-0">
-          <div className="overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full min-w-[640px]">
-              <thead>
-                <tr className="border-b border-neutral-800">
-                  <th className="text-left py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500 sticky left-0 bg-neutral-950 z-10">Game</th>
-                  <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    <button
-                      onClick={() => setSortByBestPercent(false)}
-                      className={`inline-flex items-center gap-1 hover:text-white transition-colors ${
-                        !sortByBestPercent ? 'text-lime-400' : ''
-                      }`}
-                    >
-                      Time
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
-                  </th>
-                  <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    <button
-                      onClick={() => setSortByBestPercent(true)}
-                      className={`inline-flex items-center gap-1 hover:text-white transition-colors ${
-                        sortByBestPercent ? 'text-lime-400' : ''
-                      }`}
-                    >
-                      Best %
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
-                  </th>
-                  {selectedBooks.map((book) => (
-                    <th key={book} className="text-center py-3 md:py-4 px-1 md:px-2 text-xs md:text-sm font-medium text-neutral-500 min-w-[60px] md:min-w-[80px]">
-                      {book}
-                    </th>
-                  ))}
-                  <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Best</th>
-                </tr>
-              </thead>
-              <tbody>
+          {!loading && filteredGames.length > 0 && (
+            <div className="md:hidden flex items-center justify-center gap-2 flex-wrap px-4 py-3 border-b border-neutral-800 bg-neutral-950">
+              <span className="text-xs text-neutral-500">Sort</span>
+              <button
+                type="button"
+                onClick={() => setSortByBestPercent(false)}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  !sortByBestPercent
+                    ? 'border-lime-500/40 text-lime-400 bg-lime-500/5'
+                    : 'border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                }`}
+              >
+                Time
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortByBestPercent(true)}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  sortByBestPercent
+                    ? 'border-lime-500/40 text-lime-400 bg-lime-500/5'
+                    : 'border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                }`}
+              >
+                Best %
+              </button>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="text-center py-16 text-neutral-500">Loading odds data...</div>
+          ) : filteredGames.length === 0 ? (
+            <div className="text-center py-16 text-neutral-500">
+              No games found matching your filters
+            </div>
+          ) : (
+            <>
+              <div className="md:hidden">
                 {filteredGames.map(({ game, bestPercent }) => (
-                  <OddsRow
+                  <OddsGameCard
                     key={game.id}
                     game={game}
                     marketType={marketFilter}
@@ -389,20 +402,69 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                     onOddsClick={onOddsClick}
                   />
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredGames.length === 0 && !loading && (
-            <div className="text-center py-16 text-neutral-500">
-              No games found matching your filters
-            </div>
-          )}
-
-          {loading && (
-            <div className="text-center py-16 text-neutral-500">
-              Loading odds data...
-            </div>
+              </div>
+              <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
+                <table className="w-full min-w-[640px]">
+                  <thead>
+                    <tr className="border-b border-neutral-800">
+                      <th
+                        scope="col"
+                        className="text-left py-3 md:py-4 pl-5 pr-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500 sticky left-0 z-20 bg-neutral-950 border-r border-neutral-800 shadow-[6px_0_12px_-4px_rgba(0,0,0,0.65)] min-w-[13rem] max-w-[15rem] sm:min-w-[14rem] sm:max-w-[17rem] md:min-w-[16rem] md:max-w-[22rem] lg:max-w-[26rem]"
+                      >
+                        Game
+                      </th>
+                      <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        <button
+                          type="button"
+                          onClick={() => setSortByBestPercent(false)}
+                          className={`inline-flex items-center gap-1 hover:text-white transition-colors ${
+                            !sortByBestPercent ? 'text-lime-400' : ''
+                          }`}
+                        >
+                          Time
+                          <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        <button
+                          type="button"
+                          onClick={() => setSortByBestPercent(true)}
+                          className={`inline-flex items-center gap-1 hover:text-white transition-colors ${
+                            sortByBestPercent ? 'text-lime-400' : ''
+                          }`}
+                        >
+                          Best %
+                          <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      {selectedBooks.map((book) => (
+                        <th
+                          key={book}
+                          className="text-center py-3 md:py-4 px-1 md:px-2 text-xs md:text-sm font-medium text-neutral-500 min-w-[60px] md:min-w-[80px]"
+                        >
+                          {book}
+                        </th>
+                      ))}
+                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Best
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredGames.map(({ game, bestPercent }) => (
+                      <OddsRow
+                        key={game.id}
+                        game={game}
+                        marketType={marketFilter}
+                        selectedBooks={selectedBooks}
+                        bestPercent={bestPercent}
+                        onOddsClick={onOddsClick}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

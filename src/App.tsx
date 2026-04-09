@@ -74,8 +74,8 @@ function App() {
         className="transition-all duration-300"
         style={{ marginLeft: contentMargin }}
       >
-        <main className="min-h-screen pb-20 md:pb-0">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-12">
+        <main className="min-h-[100dvh] min-h-screen pb-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:pb-0 md:min-h-screen">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-12">
             {renderContent()}
           </div>
         </main>

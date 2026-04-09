@@ -3,6 +3,7 @@ import { Target, BarChart2, TrendingUp, Download, Plus, CheckCircle, XCircle, Tr
 import { supabase } from '../../lib/supabase';
 import { Bet } from '../../types/database';
 import { AddBetModal } from './AddBetModal';
+import { BetMobileCard } from './BetMobileCard';
 import { formatCurrency } from '../../utils/odds';
 
 type BetStatus = 'all' | 'pending' | 'won' | 'lost';
@@ -161,19 +162,19 @@ export function BetTracker() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 max-w-4xl mx-auto">
-        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Total</p>
           <p className="text-xl md:text-2xl font-bold text-white font-mono">{stats.total}</p>
         </div>
-        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Pending</p>
           <p className="text-xl md:text-2xl font-bold text-amber-400 font-mono">{stats.pending}</p>
         </div>
-        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Won</p>
           <p className="text-xl md:text-2xl font-bold text-lime-400 font-mono">{stats.won}</p>
         </div>
-        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Staked</p>
           <p className="text-xl md:text-2xl font-bold text-blue-400 font-mono">{formatCurrency(stats.totalStaked)}</p>
         </div>
@@ -217,108 +218,125 @@ export function BetTracker() {
         </div>
 
         <div className="card overflow-hidden p-0">
-          <div className="overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full min-w-[600px]">
-              <thead>
-                <tr className="border-b border-neutral-800">
-                  <th className="text-left py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Bet Name</th>
-                  <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Book</th>
-                  <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Odds</th>
-                  <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Staked</th>
-                  <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Date</th>
-                  <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Status</th>
-                  <th className="text-right py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="py-16 text-center text-neutral-500">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : Object.keys(groupedBets).length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-16 text-center text-neutral-500">
-                      No bets yet. Click "Add Bet" to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  Object.entries(groupedBets).map(([groupId, groupBets]) =>
-                    groupBets.map((bet, idx) => (
-                      <tr
-                        key={bet.id}
-                        className={`border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors ${
-                          groupBets.length > 1 && idx === 0 ? 'border-l-2 border-l-cyan-500' : ''
-                        } ${groupBets.length > 1 && idx > 0 ? 'border-l-2 border-l-cyan-500/50' : ''}`}
-                      >
-                        <td className="py-3 md:py-4 px-3 md:px-4">
-                          <div className="flex items-center gap-1 md:gap-2">
-                            <span className="font-medium text-white text-xs md:text-sm truncate max-w-[100px] md:max-w-none">{bet.bet_name}</span>
-                            {bet.is_bonus_bet && (
-                              <span className="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] bg-amber-500/20 text-amber-400 rounded">
-                                B
-                              </span>
-                            )}
-                            {bet.is_odds_boost && (
-                              <span className="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] bg-lime-500/20 text-lime-400 rounded">
-                                +
-                              </span>
-                            )}
-                          </div>
-                          {groupBets.length > 1 && idx === 0 && (
-                            <div className="text-[8px] md:text-[10px] text-cyan-400 mt-0.5">Grouped</div>
-                          )}
-                        </td>
-                        <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-400">{bet.sportsbook}</td>
-                        <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">
-                          {formatOdds(bet.odds)}
-                        </td>
-                        <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">
-                          {formatCurrency(bet.amount_staked)}
-                        </td>
-                        <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-500">
-                          {formatDate(bet.created_at)}
-                        </td>
-                        <td className="py-3 md:py-4 px-2 md:px-4 text-center">
-                          <span className={`${getStatusClass(bet.status)} text-[10px] md:text-xs`}>{bet.status}</span>
-                        </td>
-                        <td className="py-3 md:py-4 px-3 md:px-4">
-                          <div className="flex justify-end gap-0.5 md:gap-1">
-                            {bet.status === 'pending' && (
-                              <>
-                                <button
-                                  onClick={() => updateBetStatus(bet.id, 'won')}
-                                  className="p-1 md:p-1.5 text-neutral-500 hover:text-lime-400 hover:bg-lime-500/10 rounded transition-colors"
-                                  title="Mark as Won"
-                                >
-                                  <CheckCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                                </button>
-                                <button
-                                  onClick={() => updateBetStatus(bet.id, 'lost')}
-                                  className="p-1 md:p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                                  title="Mark as Lost"
-                                >
-                                  <XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={() => deleteBet(bet.id)}
-                              className="p-1 md:p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )
+          {loading ? (
+            <div className="text-center py-16 text-neutral-500">Loading...</div>
+          ) : Object.keys(groupedBets).length === 0 ? (
+            <div className="text-center py-16 text-neutral-500 px-4">
+              No bets yet. Click &quot;Add&quot; to get started.
+            </div>
+          ) : (
+            <>
+              <div className="md:hidden">
+                {Object.entries(groupedBets).map(([, groupBets]) =>
+                  groupBets.map((bet, idx) => (
+                    <BetMobileCard
+                      key={bet.id}
+                      bet={bet}
+                      isGrouped={groupBets.length > 1}
+                      isFirstInGroup={idx === 0}
+                      formatOdds={formatOdds}
+                      formatDate={formatDate}
+                      getStatusClass={getStatusClass}
+                      onMarkWon={(id) => updateBetStatus(id, 'won')}
+                      onMarkLost={(id) => updateBetStatus(id, 'lost')}
+                      onDelete={deleteBet}
+                    />
+                  ))
                 )}
-              </tbody>
-            </table>
-          </div>
+              </div>
+              <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
+                <table className="w-full min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-neutral-800">
+                      <th className="text-left py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Bet Name</th>
+                      <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Book</th>
+                      <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Odds</th>
+                      <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Staked</th>
+                      <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Date</th>
+                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Status</th>
+                      <th className="text-right py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(groupedBets).map(([, groupBets]) =>
+                      groupBets.map((bet, idx) => (
+                        <tr
+                          key={bet.id}
+                          className={`border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors ${
+                            groupBets.length > 1 && idx === 0 ? 'border-l-2 border-l-cyan-500' : ''
+                          } ${groupBets.length > 1 && idx > 0 ? 'border-l-2 border-l-cyan-500/50' : ''}`}
+                        >
+                          <td className="py-3 md:py-4 px-3 md:px-4">
+                            <div className="flex items-center gap-1 md:gap-2">
+                              <span className="font-medium text-white text-xs md:text-sm truncate max-w-[100px] md:max-w-none">{bet.bet_name}</span>
+                              {bet.is_bonus_bet && (
+                                <span className="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] bg-amber-500/20 text-amber-400 rounded">
+                                  B
+                                </span>
+                              )}
+                              {bet.is_odds_boost && (
+                                <span className="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] bg-lime-500/20 text-lime-400 rounded">
+                                  +
+                                </span>
+                              )}
+                            </div>
+                            {groupBets.length > 1 && idx === 0 && (
+                              <div className="text-[8px] md:text-[10px] text-cyan-400 mt-0.5">Grouped</div>
+                            )}
+                          </td>
+                          <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-400">{bet.sportsbook}</td>
+                          <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">
+                            {formatOdds(bet.odds)}
+                          </td>
+                          <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">
+                            {formatCurrency(bet.amount_staked)}
+                          </td>
+                          <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-500">
+                            {formatDate(bet.created_at)}
+                          </td>
+                          <td className="py-3 md:py-4 px-2 md:px-4 text-center">
+                            <span className={`${getStatusClass(bet.status)} text-[10px] md:text-xs`}>{bet.status}</span>
+                          </td>
+                          <td className="py-3 md:py-4 px-3 md:px-4">
+                            <div className="flex justify-end gap-0.5 md:gap-1">
+                              {bet.status === 'pending' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateBetStatus(bet.id, 'won')}
+                                    className="p-1 md:p-1.5 text-neutral-500 hover:text-lime-400 hover:bg-lime-500/10 rounded transition-colors"
+                                    title="Mark as Won"
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateBetStatus(bet.id, 'lost')}
+                                    className="p-1 md:p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                    title="Mark as Lost"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => deleteBet(bet.id)}
+                                className="p-1 md:p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

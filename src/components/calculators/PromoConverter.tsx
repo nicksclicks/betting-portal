@@ -4,6 +4,8 @@ import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { OddsInput } from '../shared/OddsInput';
 import { calculatePromoConversion, formatCurrency, formatOdds } from '../../utils/odds';
 import { ALL_SPORTSBOOKS, Sportsbook } from '../../constants/sportsbooks';
+import { getMockOddsApiPayload } from '../../data/mockOdds';
+import { isLocalMockMode } from '../../lib/supabase';
 
 interface PromoOpportunity {
   gameId: string;
@@ -81,20 +83,26 @@ export function PromoConverter() {
     setOpportunities([]);
 
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-odds`;
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      let games: ApiGame[];
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch odds');
+      if (isLocalMockMode) {
+        games = getMockOddsApiPayload().games as ApiGame[];
+      } else {
+        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-odds`;
+        const response = await fetch(apiUrl, {
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch odds');
+        }
+
+        const data = await response.json();
+        games = data.games || [];
       }
-
-      const data = await response.json();
-      const games: ApiGame[] = data.games || [];
       const amount = parseFloat(scanAmount);
       const results: PromoOpportunity[] = [];
 
@@ -316,17 +324,6 @@ export function PromoConverter() {
       </div>
 
       <div className="max-w-3xl mx-auto">
-        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl mb-4 md:mb-6">
-          <div className="text-xs md:text-sm text-neutral-300">
-            <p className="font-medium mb-1 md:mb-2">How Free Bets Work</p>
-            <p className="text-neutral-500">
-              With free bets, only the <span className="text-lime-400">winnings</span> are paid out -
-              the stake is NOT returned. Use free plays on <span className="text-lime-400">underdogs (+200 or higher)</span> and
-              hedge on the <span className="text-amber-400">favorite</span> at a different book.
-            </p>
-          </div>
-        </div>
-
         <div className="flex items-center justify-between mb-4 md:mb-6">
           <h2 className="text-base md:text-lg font-semibold text-white">Enter Bet Details</h2>
           <div className="flex gap-2">
@@ -430,7 +427,18 @@ export function PromoConverter() {
         )}
       </div>
 
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
+        <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+          <div className="text-xs md:text-sm text-neutral-300">
+            <p className="font-medium mb-1 md:mb-2">How Free Bets Work</p>
+            <p className="text-neutral-500">
+              With free bets, only the <span className="text-lime-400">winnings</span> are paid out -
+              the stake is NOT returned. Use free plays on <span className="text-lime-400">underdogs (+200 or higher)</span> and
+              hedge on the <span className="text-amber-400">favorite</span> at a different book.
+            </p>
+          </div>
+        </div>
+
         <div className="p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
           <h4 className="text-sm font-medium text-neutral-300 mb-3">Pro Tips</h4>
           <ul className="text-sm text-neutral-500 space-y-2">

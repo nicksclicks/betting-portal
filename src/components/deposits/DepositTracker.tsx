@@ -5,6 +5,7 @@ import { Deposit, DepositInsert, DepositUpdate } from '../../types/database';
 import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { formatCurrency } from '../../utils/odds';
 import { DEPOSIT_STATUSES, DepositStatus } from '../../constants/sportsbooks';
+import { DepositMobileCard } from './DepositMobileCard';
 
 export function DepositTracker() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -210,19 +211,19 @@ export function DepositTracker() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 md:gap-4 max-w-4xl mx-auto">
-        <div className="p-3 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-3 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Deposited</p>
           <p className="text-lg md:text-2xl font-bold text-white font-mono">
             {formatCurrency(totalDeposited)}
           </p>
         </div>
-        <div className="p-3 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-3 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Bonus</p>
           <p className="text-lg md:text-2xl font-bold text-lime-400 font-mono">
             {formatCurrency(totalBonus)}
           </p>
         </div>
-        <div className="p-3 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
+        <div className="p-3 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl text-center">
           <p className="text-neutral-500 text-xs md:text-sm mb-1">Balance</p>
           <p className="text-lg md:text-2xl font-bold text-blue-400 font-mono">
             {formatCurrency(totalBalance)}
@@ -396,105 +397,115 @@ export function DepositTracker() {
         )}
 
         <div className="card overflow-hidden p-0">
-          <div className="overflow-x-auto -mx-4 md:mx-0">
-            <table className="w-full min-w-[700px]">
-              <thead>
-                <tr className="border-b border-neutral-800">
-                  <th className="text-left py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Sportsbook
-                  </th>
-                  <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Deposit
-                  </th>
-                  <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Date
-                  </th>
-                  <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Bonus
-                  </th>
-                  <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Roll
-                  </th>
-                  <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Balance
-                  </th>
-                  <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Status
-                  </th>
-                  <th className="text-right py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="py-16 text-center text-neutral-500">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : deposits.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-16 text-center text-neutral-500">
-                      No deposits yet. Click "Add Deposit" to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  deposits.map((deposit) => (
-                    <tr
-                      key={deposit.id}
-                      className="border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors"
-                    >
-                      <td className="py-3 md:py-4 px-3 md:px-4">
-                        <div className="font-medium text-white text-xs md:text-sm">{deposit.sportsbook}</div>
-                        {deposit.notes && (
-                          <div className="text-[10px] md:text-xs text-neutral-600 truncate max-w-[100px] md:max-w-[150px]">
-                            {deposit.notes}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">
-                        {formatCurrency(deposit.deposit_amount)}
-                      </td>
-                      <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-500">
-                        {formatDate(deposit.deposit_date)}
-                      </td>
-                      <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-lime-400 text-xs md:text-sm">
-                        {deposit.bonus_received > 0
-                          ? formatCurrency(deposit.bonus_received)
-                          : '-'}
-                      </td>
-                      <td className="py-3 md:py-4 px-2 md:px-4 text-center text-xs md:text-sm text-neutral-500">
-                        {deposit.rollover_multiplier}x
-                      </td>
-                      <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-blue-400 text-xs md:text-sm">
-                        {formatCurrency(deposit.current_balance)}
-                      </td>
-                      <td className="py-3 md:py-4 px-2 md:px-4 text-center">
-                        <span className={`${getStatusClass(deposit.status)} text-[10px] md:text-xs`}>{deposit.status}</span>
-                      </td>
-                      <td className="py-3 md:py-4 px-3 md:px-4">
-                        <div className="flex justify-end gap-1 md:gap-2">
-                          <button
-                            onClick={() => handleEdit(deposit)}
-                            className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 rounded-lg transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(deposit.id)}
-                            className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/30 rounded-lg transition-colors"
-                          >
-                            Del
-                          </button>
-                        </div>
-                      </td>
+          {loading ? (
+            <div className="text-center py-16 text-neutral-500">Loading...</div>
+          ) : deposits.length === 0 ? (
+            <div className="text-center py-16 text-neutral-500 px-4">
+              No deposits yet. Click &quot;Add&quot; to get started.
+            </div>
+          ) : (
+            <>
+              <div className="md:hidden">
+                {deposits.map((deposit) => (
+                  <DepositMobileCard
+                    key={deposit.id}
+                    deposit={deposit}
+                    formatDate={formatDate}
+                    getStatusClass={getStatusClass}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+              <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
+                <table className="w-full min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-neutral-800">
+                      <th className="text-left py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Sportsbook
+                      </th>
+                      <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Deposit
+                      </th>
+                      <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Date
+                      </th>
+                      <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Bonus
+                      </th>
+                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Roll
+                      </th>
+                      <th className="text-right py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Balance
+                      </th>
+                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Status
+                      </th>
+                      <th className="text-right py-3 md:py-4 px-3 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                        Actions
+                      </th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {deposits.map((deposit) => (
+                      <tr
+                        key={deposit.id}
+                        className="border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors"
+                      >
+                        <td className="py-3 md:py-4 px-3 md:px-4">
+                          <div className="font-medium text-white text-xs md:text-sm">{deposit.sportsbook}</div>
+                          {deposit.notes && (
+                            <div className="text-[10px] md:text-xs text-neutral-600 truncate max-w-[100px] md:max-w-[150px]">
+                              {deposit.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">
+                          {formatCurrency(deposit.deposit_amount)}
+                        </td>
+                        <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-500">
+                          {formatDate(deposit.deposit_date)}
+                        </td>
+                        <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-lime-400 text-xs md:text-sm">
+                          {deposit.bonus_received > 0
+                            ? formatCurrency(deposit.bonus_received)
+                            : '-'}
+                        </td>
+                        <td className="py-3 md:py-4 px-2 md:px-4 text-center text-xs md:text-sm text-neutral-500">
+                          {deposit.rollover_multiplier}x
+                        </td>
+                        <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-blue-400 text-xs md:text-sm">
+                          {formatCurrency(deposit.current_balance)}
+                        </td>
+                        <td className="py-3 md:py-4 px-2 md:px-4 text-center">
+                          <span className={`${getStatusClass(deposit.status)} text-[10px] md:text-xs`}>{deposit.status}</span>
+                        </td>
+                        <td className="py-3 md:py-4 px-3 md:px-4">
+                          <div className="flex justify-end gap-1 md:gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(deposit)}
+                              className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 rounded-lg transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(deposit.id)}
+                              className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/30 rounded-lg transition-colors"
+                            >
+                              Del
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -16,46 +16,11 @@ export interface GameOdds {
   };
 }
 
-function randomOdds(base: number, variance: number): number {
-  const adjustment = Math.floor(Math.random() * variance * 2) - variance;
-  const result = base + adjustment;
-  if (result >= -100 && result <= 100) {
-    return result > 0 ? 101 : -101;
-  }
-  return result;
-}
+/** Six books used in mock grids — fixed American odds per side. */
+type MockBook = 'Bookmaker' | 'Bovada' | 'BetOnline' | 'FanDuel' | 'DraftKings' | 'BetMGM';
 
-function generateSpreadOdds(): { favorite: number; underdog: number } {
-  const juice = Math.random() > 0.5 ? 5 : 0;
-  return {
-    favorite: -110 - juice,
-    underdog: -110 + juice,
-  };
-}
-
-function generateTotalsOdds(): { over: number; under: number } {
-  const juice = Math.random() > 0.5 ? 5 : 0;
-  return {
-    over: -110 - juice,
-    under: -110 + juice,
-  };
-}
-
-const SPORTSBOOKS_FOR_ODDS: Sportsbook[] = [
-  'Bookmaker',
-  'Bovada',
-  'BetOnline',
-  'FanDuel',
-  'DraftKings',
-  'BetMGM',
-];
-
-function generateOddsForBooks(base: number, variance: number = 15): Record<Sportsbook, number> {
-  const result: Partial<Record<Sportsbook, number>> = {};
-  SPORTSBOOKS_FOR_ODDS.forEach((book) => {
-    result[book] = randomOdds(base, variance);
-  });
-  return result as Record<Sportsbook, number>;
+function bk(o: Record<MockBook, number>): Record<Sportsbook, number> {
+  return o as Record<Sportsbook, number>;
 }
 
 export const MOCK_GAMES: GameOdds[] = [
@@ -67,17 +32,59 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000 * 2),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(-145),
-        away: generateOddsForBooks(125),
+        home: bk({
+          Bookmaker: -142,
+          Bovada: -145,
+          BetOnline: -143,
+          FanDuel: -148,
+          DraftKings: -146,
+          BetMGM: -145,
+        }),
+        away: bk({
+          Bookmaker: 122,
+          Bovada: 125,
+          BetOnline: 123,
+          FanDuel: 128,
+          DraftKings: 126,
+          BetMGM: 125,
+        }),
       },
       'Point Spread': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+        home: bk({
+          Bookmaker: -112,
+          Bovada: -110,
+          BetOnline: -111,
+          FanDuel: -115,
+          DraftKings: -110,
+          BetMGM: -110,
+        }),
+        away: bk({
+          Bookmaker: -108,
+          Bovada: -110,
+          BetOnline: -109,
+          FanDuel: -105,
+          DraftKings: -110,
+          BetMGM: -110,
+        }),
         spread: -3.5,
       },
-      'Totals': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+      Totals: {
+        home: bk({
+          Bookmaker: -115,
+          Bovada: -110,
+          BetOnline: -112,
+          FanDuel: -118,
+          DraftKings: -110,
+          BetMGM: -111,
+        }),
+        away: bk({
+          Bookmaker: -105,
+          Bovada: -110,
+          BetOnline: -108,
+          FanDuel: -104,
+          DraftKings: -110,
+          BetMGM: -109,
+        }),
         total: 51.5,
       },
     },
@@ -90,12 +97,40 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000 * 3),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(-180),
-        away: generateOddsForBooks(155),
+        home: bk({
+          Bookmaker: -175,
+          Bovada: -180,
+          BetOnline: -178,
+          FanDuel: -185,
+          DraftKings: -182,
+          BetMGM: -180,
+        }),
+        away: bk({
+          Bookmaker: 148,
+          Bovada: 155,
+          BetOnline: 152,
+          FanDuel: 158,
+          DraftKings: 156,
+          BetMGM: 155,
+        }),
       },
       'Point Spread': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+        home: bk({
+          Bookmaker: -113,
+          Bovada: -110,
+          BetOnline: -111,
+          FanDuel: -114,
+          DraftKings: -110,
+          BetMGM: -110,
+        }),
+        away: bk({
+          Bookmaker: -107,
+          Bovada: -110,
+          BetOnline: -109,
+          FanDuel: -106,
+          DraftKings: -110,
+          BetMGM: -110,
+        }),
         spread: -4.5,
       },
     },
@@ -108,17 +143,59 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(-135),
-        away: generateOddsForBooks(115),
+        home: bk({
+          Bookmaker: -132,
+          Bovada: -135,
+          BetOnline: -133,
+          FanDuel: -138,
+          DraftKings: -136,
+          BetMGM: -135,
+        }),
+        away: bk({
+          Bookmaker: 112,
+          Bovada: 115,
+          BetOnline: 113,
+          FanDuel: 118,
+          DraftKings: 116,
+          BetMGM: 115,
+        }),
       },
       'Point Spread': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+        home: bk({
+          Bookmaker: -111,
+          Bovada: -110,
+          BetOnline: -110,
+          FanDuel: -112,
+          DraftKings: -108,
+          BetMGM: -110,
+        }),
+        away: bk({
+          Bookmaker: -109,
+          Bovada: -110,
+          BetOnline: -110,
+          FanDuel: -108,
+          DraftKings: -112,
+          BetMGM: -110,
+        }),
         spread: -2.5,
       },
-      'Totals': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+      Totals: {
+        home: bk({
+          Bookmaker: -112,
+          Bovada: -110,
+          BetOnline: -111,
+          FanDuel: -115,
+          DraftKings: -109,
+          BetMGM: -110,
+        }),
+        away: bk({
+          Bookmaker: -108,
+          Bovada: -110,
+          BetOnline: -109,
+          FanDuel: -105,
+          DraftKings: -111,
+          BetMGM: -110,
+        }),
         total: 228.5,
       },
     },
@@ -131,12 +208,40 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000 * 2),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(105),
-        away: generateOddsForBooks(-125),
+        home: bk({
+          Bookmaker: 108,
+          Bovada: 105,
+          BetOnline: 106,
+          FanDuel: 102,
+          DraftKings: 104,
+          BetMGM: 105,
+        }),
+        away: bk({
+          Bookmaker: -128,
+          Bovada: -125,
+          BetOnline: -126,
+          FanDuel: -122,
+          DraftKings: -124,
+          BetMGM: -125,
+        }),
       },
       'Point Spread': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+        home: bk({
+          Bookmaker: -110,
+          Bovada: -110,
+          BetOnline: -109,
+          FanDuel: -112,
+          DraftKings: -108,
+          BetMGM: -110,
+        }),
+        away: bk({
+          Bookmaker: -110,
+          Bovada: -110,
+          BetOnline: -111,
+          FanDuel: -108,
+          DraftKings: -112,
+          BetMGM: -110,
+        }),
         spread: 2.5,
       },
     },
@@ -149,12 +254,40 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000 * 4),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(-130),
-        away: generateOddsForBooks(110),
+        home: bk({
+          Bookmaker: -128,
+          Bovada: -130,
+          BetOnline: -129,
+          FanDuel: -134,
+          DraftKings: -131,
+          BetMGM: -130,
+        }),
+        away: bk({
+          Bookmaker: 108,
+          Bovada: 110,
+          BetOnline: 109,
+          FanDuel: 114,
+          DraftKings: 111,
+          BetMGM: 110,
+        }),
       },
-      'Totals': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+      Totals: {
+        home: bk({
+          Bookmaker: -114,
+          Bovada: -110,
+          BetOnline: -112,
+          FanDuel: -116,
+          DraftKings: -110,
+          BetMGM: -111,
+        }),
+        away: bk({
+          Bookmaker: -106,
+          Bovada: -110,
+          BetOnline: -108,
+          FanDuel: -104,
+          DraftKings: -110,
+          BetMGM: -109,
+        }),
         total: 8.5,
       },
     },
@@ -167,12 +300,40 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(-115),
-        away: generateOddsForBooks(-105),
+        home: bk({
+          Bookmaker: -112,
+          Bovada: -115,
+          BetOnline: -114,
+          FanDuel: -118,
+          DraftKings: -116,
+          BetMGM: -115,
+        }),
+        away: bk({
+          Bookmaker: -102,
+          Bovada: -105,
+          BetOnline: -104,
+          FanDuel: -100,
+          DraftKings: -102,
+          BetMGM: -105,
+        }),
       },
-      'Totals': {
-        home: generateOddsForBooks(-110, 5),
-        away: generateOddsForBooks(-110, 5),
+      Totals: {
+        home: bk({
+          Bookmaker: -113,
+          Bovada: -110,
+          BetOnline: -111,
+          FanDuel: -114,
+          DraftKings: -109,
+          BetMGM: -110,
+        }),
+        away: bk({
+          Bookmaker: -107,
+          Bovada: -110,
+          BetOnline: -109,
+          FanDuel: -106,
+          DraftKings: -111,
+          BetMGM: -110,
+        }),
         total: 6.5,
       },
     },
@@ -185,8 +346,22 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000 * 5),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(-125),
-        away: generateOddsForBooks(350),
+        home: bk({
+          Bookmaker: -122,
+          Bovada: -125,
+          BetOnline: -124,
+          FanDuel: -128,
+          DraftKings: -126,
+          BetMGM: -125,
+        }),
+        away: bk({
+          Bookmaker: 340,
+          Bovada: 350,
+          BetOnline: 345,
+          FanDuel: 360,
+          DraftKings: 355,
+          BetMGM: 350,
+        }),
       },
     },
   },
@@ -198,9 +373,86 @@ export const MOCK_GAMES: GameOdds[] = [
     gameTime: new Date(Date.now() + 86400000 * 3),
     odds: {
       'Money Line': {
-        home: generateOddsForBooks(130),
-        away: generateOddsForBooks(-150),
+        home: bk({
+          Bookmaker: 128,
+          Bovada: 130,
+          BetOnline: 129,
+          FanDuel: 125,
+          DraftKings: 127,
+          BetMGM: 130,
+        }),
+        away: bk({
+          Bookmaker: -152,
+          Bovada: -150,
+          BetOnline: -151,
+          FanDuel: -148,
+          DraftKings: -150,
+          BetMGM: -150,
+        }),
       },
     },
   },
 ];
+
+/** Same shape as the fetch-odds edge function JSON (for local mock mode). */
+export interface MockOddsApiGame {
+  id: string;
+  sport: string;
+  homeTeam: string;
+  awayTeam: string;
+  gameTime: string;
+  odds: Record<
+    string,
+    Record<string, { home: number | null; away: number | null; spread?: number; total?: number }>
+  >;
+}
+
+/**
+ * Edge function uses per-book objects: odds["Money Line"]["Bovada"] = { home, away }.
+ * MOCK_GAMES uses UI shape: odds["Money Line"].home["Bovada"]. Convert here so
+ * OddsBoard's transformApiGames matches the real API.
+ */
+function gameOddsToApiShape(game: GameOdds): MockOddsApiGame['odds'] {
+  const out: MockOddsApiGame['odds'] = {};
+
+  for (const [marketKey, marketData] of Object.entries(game.odds)) {
+    if (!marketData) continue;
+    const { home: homeByBook, away: awayByBook, spread, total } = marketData;
+    const bookNames = new Set([
+      ...Object.keys(homeByBook ?? {}),
+      ...Object.keys(awayByBook ?? {}),
+    ]);
+
+    const byBook: Record<
+      string,
+      { home: number | null; away: number | null; spread?: number; total?: number }
+    > = {};
+    for (const book of bookNames) {
+      const h = homeByBook?.[book as Sportsbook];
+      const a = awayByBook?.[book as Sportsbook];
+      byBook[book] = {
+        home: h !== undefined ? h : null,
+        away: a !== undefined ? a : null,
+        ...(spread !== undefined ? { spread } : {}),
+        ...(total !== undefined ? { total } : {}),
+      };
+    }
+    out[marketKey] = byBook;
+  }
+
+  return out;
+}
+
+export function getMockOddsApiPayload(): { games: MockOddsApiGame[]; updated: string } {
+  return {
+    games: MOCK_GAMES.map((g) => ({
+      id: g.id,
+      sport: g.sport,
+      homeTeam: g.homeTeam,
+      awayTeam: g.awayTeam,
+      gameTime: g.gameTime.toISOString(),
+      odds: gameOddsToApiShape(g),
+    })),
+    updated: new Date().toISOString(),
+  };
+}

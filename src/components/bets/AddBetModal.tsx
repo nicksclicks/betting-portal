@@ -99,11 +99,11 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-4xl mx-4 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-neutral-800">
-          <h2 className="text-xl font-semibold text-white">Add to Bet Tracker</h2>
+      <div className="relative w-full sm:max-w-4xl max-h-[min(92dvh,900px)] sm:mx-4 bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-neutral-800 shrink-0">
+          <h2 className="text-lg sm:text-xl font-semibold text-white pr-2">Add to Bet Tracker</h2>
           <button
             onClick={onClose}
             className="p-2 text-neutral-400 hover:text-white transition-colors"
@@ -112,10 +112,10 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
           </button>
         </div>
 
-        <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-6 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {bets.map((bet, index) => (
             <div key={bet.id} className="space-y-4">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm text-neutral-400 mb-2">Bet Name</label>
                   <input
@@ -172,7 +172,7 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <div
                     className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
@@ -232,11 +232,19 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
           </button>
         </div>
 
-        <div className="flex items-center justify-end p-6 border-t border-neutral-800">
+        <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-neutral-800 shrink-0 safe-area-bottom">
           <button
+            type="button"
+            onClick={onClose}
+            className="sm:hidden px-4 py-3 text-neutral-400 hover:text-white font-medium rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-6 py-3 bg-white hover:bg-neutral-200 disabled:bg-white/50 text-black font-semibold rounded-xl transition-colors"
+            className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-neutral-200 disabled:bg-white/50 text-black font-semibold rounded-xl transition-colors"
           >
             {isSubmitting ? 'Tracking...' : 'Track'}
           </button>

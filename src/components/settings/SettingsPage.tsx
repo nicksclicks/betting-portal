@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, Mail, Calendar, Shield, UserPlus, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { UserManagementMobileCard } from './UserManagementMobileCard';
 
 interface UserData {
   id: string;
@@ -196,19 +197,20 @@ export function SettingsPage() {
 
         {isAdmin && (
           <div className="card">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="feature-icon">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="feature-icon shrink-0">
                   <Shield className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-white">User Management</h2>
                   <p className="text-neutral-500 text-sm">Add or remove users from the system</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowAddUser(!showAddUser)}
-                className="btn-primary flex items-center gap-2"
+                className="btn-primary flex items-center justify-center gap-2 w-full md:w-auto shrink-0"
               >
                 <UserPlus className="w-4 h-4" />
                 Add User
@@ -251,17 +253,19 @@ export function SettingsPage() {
                     </select>
                   </div>
                 </div>
-                <div className="flex justify-end gap-3">
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                   <button
+                    type="button"
                     onClick={() => setShowAddUser(false)}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                   >
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={handleAddUser}
                     disabled={addingUser || !newUserName.trim() || !newUserEmail.trim()}
-                    className="btn-primary flex items-center gap-2"
+                    className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     {addingUser ? (
                       <>
@@ -276,8 +280,20 @@ export function SettingsPage() {
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="md:hidden border-t border-neutral-800 -mx-4 px-4 sm:-mx-6 sm:px-6">
+              {users.map((user) => (
+                <UserManagementMobileCard
+                  key={user.id}
+                  user={user}
+                  currentUserId={currentUser?.id ?? null}
+                  deletingUserId={deletingUserId}
+                  onRemove={handleRemoveUser}
+                />
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-neutral-800">
                     <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Name</th>
@@ -305,8 +321,9 @@ export function SettingsPage() {
                         {formatDate(user.created_at)}
                       </td>
                       <td className="py-3 px-3 text-right">
-                        {user.id !== currentUser?.id ? (
+                        {user.id !== currentUser?.id && (
                           <button
+                            type="button"
                             onClick={() => handleRemoveUser(user.id)}
                             disabled={deletingUserId === user.id}
                             className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -317,8 +334,6 @@ export function SettingsPage() {
                               <Trash2 className="w-4 h-4" />
                             )}
                           </button>
-                        ) : (
-                          <span className="text-xs text-neutral-600">Current user</span>
                         )}
                       </td>
                     </tr>
