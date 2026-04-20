@@ -189,12 +189,13 @@ export function BetTracker() {
             <div className="flex gap-0.5 md:gap-1">
               {(['all', 'pending', 'won', 'lost'] as BetStatus[]).map((status) => (
                 <button
+                  type="button"
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs rounded-lg transition-colors capitalize ${
+                  className={`touch-manipulation inline-flex items-center justify-center px-2 md:px-3 py-1 md:py-1.5 pointer-coarse:min-h-[44px] text-[10px] md:text-xs rounded-lg transition-colors capitalize active:bg-neutral-800 ${
                     statusFilter === status
-                      ? 'bg-cyan-500 text-black font-medium'
-                      : 'text-neutral-500 hover:text-white'
+                      ? 'bg-cyan-500 text-black font-medium active:bg-cyan-400'
+                      : 'text-neutral-500 hover:text-white active:text-white'
                   }`}
                 >
                   {status}
@@ -203,13 +204,14 @@ export function BetTracker() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={exportToCSV} className="btn-secondary text-xs md:text-sm flex items-center gap-2">
+            <button type="button" onClick={exportToCSV} className="touch-manipulation btn-secondary text-xs md:text-sm flex items-center gap-2">
               <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
               <span className="hidden sm:inline">Export</span> CSV
             </button>
             <button
+              type="button"
               onClick={() => setIsModalOpen(true)}
-              className="btn-primary text-xs md:text-sm flex items-center gap-2"
+              className="touch-manipulation btn-primary text-xs md:text-sm flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
               Add
@@ -304,7 +306,7 @@ export function BetTracker() {
                                   <button
                                     type="button"
                                     onClick={() => updateBetStatus(bet.id, 'won')}
-                                    className="p-1 md:p-1.5 text-neutral-500 hover:text-lime-400 hover:bg-lime-500/10 rounded transition-colors"
+                                    className="touch-manipulation inline-flex items-center justify-center p-1 md:p-1.5 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:p-2 text-neutral-500 hover:text-lime-400 hover:bg-lime-500/10 active:bg-lime-500/20 rounded transition-colors"
                                     title="Mark as Won"
                                   >
                                     <CheckCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -312,7 +314,7 @@ export function BetTracker() {
                                   <button
                                     type="button"
                                     onClick={() => updateBetStatus(bet.id, 'lost')}
-                                    className="p-1 md:p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                    className="touch-manipulation inline-flex items-center justify-center p-1 md:p-1.5 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/15 rounded transition-colors"
                                     title="Mark as Lost"
                                   >
                                     <XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -322,7 +324,7 @@ export function BetTracker() {
                               <button
                                 type="button"
                                 onClick={() => deleteBet(bet.id)}
-                                className="p-1 md:p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                className="touch-manipulation inline-flex items-center justify-center p-1 md:p-1.5 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 rounded transition-colors"
                                 title="Delete"
                               >
                                 <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />

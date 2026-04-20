@@ -37,7 +37,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`flex flex-col items-center justify-center shrink-0 snap-center min-w-[3rem] flex-1 basis-0 py-2 px-1 rounded-lg transition-colors ${
+              className={`touch-manipulation flex flex-col items-center justify-center shrink-0 snap-center min-w-[3rem] flex-1 basis-0 py-2 px-1 rounded-lg transition-colors ${
                 isActive
                   ? 'text-cyan-400 bg-cyan-500/10'
                   : 'text-neutral-500 active:text-neutral-300 active:bg-neutral-900'

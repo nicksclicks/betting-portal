@@ -48,7 +48,7 @@ export function OddsRow({ game, marketType, selectedBooks, bestPercent, onOddsCl
             <button
               type="button"
               onClick={handleRowClick}
-              className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-mono text-xs md:text-sm font-semibold transition-colors hover:opacity-80 ${getBestPercentColorClass(bestPercent.color)}`}
+              className={`touch-manipulation pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:inline-flex pointer-coarse:items-center pointer-coarse:justify-center px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-mono text-xs md:text-sm font-semibold transition-colors hover:opacity-80 active:opacity-70 ${getBestPercentColorClass(bestPercent.color)}`}
             >
               {formatPercent(bestPercent.percent)}
             </button>
@@ -69,7 +69,7 @@ export function OddsRow({ game, marketType, selectedBooks, bestPercent, onOddsCl
                 <button
                   type="button"
                   onClick={() => handleOddsClick(game.awayTeam, odds, book, false)}
-                  className={`odds-cell w-full text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 ${
+                  className={`odds-cell w-full text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 ${
                     odds > 0 ? 'odds-positive' : 'odds-negative'
                   } ${isBest ? 'bg-lime-500/10 ring-1 ring-lime-500/30' : ''} ${
                     isSelected && !isBest ? 'bg-neutral-700/30 ring-1 ring-neutral-500/40' : ''
@@ -109,7 +109,7 @@ export function OddsRow({ game, marketType, selectedBooks, bestPercent, onOddsCl
                 <button
                   type="button"
                   onClick={() => handleOddsClick(game.homeTeam, odds, book, true)}
-                  className={`odds-cell w-full text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 ${
+                  className={`odds-cell w-full text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 ${
                     odds > 0 ? 'odds-positive' : 'odds-negative'
                   } ${isBest ? 'bg-lime-500/10 ring-1 ring-lime-500/30' : ''} ${
                     isSelected && !isBest ? 'bg-neutral-700/30 ring-1 ring-neutral-500/40' : ''

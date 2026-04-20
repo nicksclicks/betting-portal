@@ -486,14 +486,14 @@ export function DepositTracker() {
                             <button
                               type="button"
                               onClick={() => handleEdit(deposit)}
-                              className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 rounded-lg transition-colors"
+                              className="touch-manipulation inline-flex items-center justify-center px-2 md:px-3 py-1 md:py-1.5 pointer-coarse:min-h-[44px] text-[10px] md:text-xs text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 active:bg-neutral-900 rounded-lg transition-colors"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(deposit.id)}
-                              className="px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/30 rounded-lg transition-colors"
+                              className="touch-manipulation inline-flex items-center justify-center px-2 md:px-3 py-1 md:py-1.5 pointer-coarse:min-h-[44px] text-[10px] md:text-xs text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/30 active:bg-red-500/10 rounded-lg transition-colors"
                             >
                               Del
                             </button>
