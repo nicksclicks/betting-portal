@@ -9,7 +9,9 @@ import {
   BarChart3,
   Settings,
   Scale,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -28,6 +30,7 @@ const navItems = [
 
 export function Sidebar({ activeTab, onTabChange, onCollapseChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const { signOut, isLocalMock, isAuthenticated } = useAuth();
 
   useEffect(() => {
     onCollapseChange?.(collapsed);
@@ -90,7 +93,7 @@ export function Sidebar({ activeTab, onTabChange, onCollapseChange }: SidebarPro
         </ul>
       </nav>
 
-      <div className="p-2 border-t border-neutral-800">
+      <div className="p-2 border-t border-neutral-800 space-y-1">
         <button
           onClick={() => onTabChange('settings')}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
@@ -103,6 +106,19 @@ export function Sidebar({ activeTab, onTabChange, onCollapseChange }: SidebarPro
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span className="text-sm font-medium">Settings</span>}
         </button>
+        {isAuthenticated && !isLocalMock && (
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-neutral-400 hover:text-white hover:bg-neutral-900 ${
+              collapsed ? 'justify-center' : ''
+            }`}
+            title={collapsed ? 'Sign out' : undefined}
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && <span className="text-sm font-medium">Sign out</span>}
+          </button>
+        )}
       </div>
 
     </aside>

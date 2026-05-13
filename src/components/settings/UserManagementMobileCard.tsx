@@ -13,6 +13,7 @@ interface UserManagementMobileCardProps {
   currentUserId: string | null;
   deletingUserId: string | null;
   onRemove: (userId: string) => void;
+  roleLabel?: (role: 'admin' | 'user') => string;
 }
 
 function formatMemberSince(dateString: string) {
@@ -28,6 +29,7 @@ export function UserManagementMobileCard({
   currentUserId,
   deletingUserId,
   onRemove,
+  roleLabel = (role) => (role === 'admin' ? 'Admin' : 'Basic'),
 }: UserManagementMobileCardProps) {
   const isSelf = user.id === currentUserId;
 
@@ -45,7 +47,7 @@ export function UserManagementMobileCard({
               : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
           }`}
         >
-          {user.role === 'admin' ? 'Admin' : 'User'}
+          {roleLabel(user.role)}
         </span>
       </div>
 

@@ -2,7 +2,14 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Activity, RefreshCw, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { SPORTS, MARKET_TYPES, ALL_SPORTSBOOKS, Sport, MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { GameOdds, getMockOddsApiPayload } from '../../data/mockOdds';
-import { isLocalMockMode } from '../../lib/supabase';
+import {
+  fetchOddsRows,
+  maxUpdatedAtFromRows,
+  oddsRowsToApiGames,
+  refreshOddsViaEdgeFunction,
+  type OddsApiGame,
+} from '../../lib/oddsFromSupabase';
+import { isLocalMockMode, supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
 import { calculateGameBestPercent } from '../../utils/bestPercent';
@@ -18,16 +25,7 @@ interface OddsBoardProps {
   }) => void;
 }
 
-interface ApiGame {
-  id: string;
-  sport: string;
-  homeTeam: string;
-  awayTeam: string;
-  gameTime: string;
-  odds: Record<string, Record<string, { home: number | null; away: number | null; spread?: number; total?: number }>>;
-}
-
-function transformApiGames(apiGames: ApiGame[]): GameOdds[] {
+function transformApiGames(apiGames: OddsApiGame[]): GameOdds[] {
   return apiGames.map((game) => {
     const oddsData: GameOdds['odds'] = {};
 
@@ -81,46 +79,52 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sortByBestPercent, setSortByBestPercent] = useState(false);
 
-  const fetchOdds = useCallback(async () => {
+  const loadOddsFromDatabase = useCallback(async () => {
     setLoading(true);
     try {
       if (isLocalMockMode) {
         const data = getMockOddsApiPayload();
-        const transformedGames = transformApiGames(data.games);
-        setGames(transformedGames);
+        setGames(transformApiGames(data.games as OddsApiGame[]));
         setLastUpdated(new Date(data.updated));
         return;
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-odds`;
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const rows = await fetchOddsRows(supabase);
+      const apiGames = oddsRowsToApiGames(rows);
+      setGames(transformApiGames(apiGames));
+      setLastUpdated(maxUpdatedAtFromRows(rows));
+    } catch (error) {
+      console.error('Error loading odds from database:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch odds');
+  const refreshOddsFromEdge = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (isLocalMockMode) {
+        const data = getMockOddsApiPayload();
+        setGames(transformApiGames(data.games as OddsApiGame[]));
+        setLastUpdated(new Date(data.updated));
+        return;
       }
 
-      const data = await response.json();
-
-      if (data.games && data.games.length > 0) {
-        const transformedGames = transformApiGames(data.games);
-        setGames(transformedGames);
-        setLastUpdated(new Date(data.updated));
+      const { games, updated } = await refreshOddsViaEdgeFunction();
+      if (games.length > 0) {
+        setGames(transformApiGames(games));
+        setLastUpdated(new Date(updated));
       }
     } catch (error) {
-      console.error('Error fetching odds:', error);
+      console.error('Error refreshing odds:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchOdds();
-  }, [fetchOdds]);
+    loadOddsFromDatabase();
+  }, [loadOddsFromDatabase]);
 
   const gamesWithBestPercent = useMemo(() => {
     return games.map((game) => ({
@@ -230,7 +234,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             </button>
             <button
               type="button"
-              onClick={fetchOdds}
+              onClick={refreshOddsFromEdge}
               disabled={loading}
               className={`touch-manipulation btn-secondary text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >

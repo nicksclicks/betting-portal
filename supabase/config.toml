@@ -1,0 +1,12 @@
+# Per-function settings applied on `supabase functions deploy`.
+# fetch-odds is invoked from the browser (Vercel). Gateway JWT verification
+# rejects OPTIONS preflight without a Bearer token, which surfaces as a CORS error.
+[functions.fetch-odds]
+verify_jwt = false
+
+# Browser calls send OPTIONS without a Bearer token; JWT is verified inside the function.
+[functions.admin-invite-user]
+verify_jwt = false
+
+[functions.admin-delete-user]
+verify_jwt = false

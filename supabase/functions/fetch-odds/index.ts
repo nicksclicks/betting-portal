@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let allOddsData: { sport: string; events: OddsApiEvent[] }[] = [];
+    const allOddsData: { sport: string; events: OddsApiEvent[] }[] = [];
 
     for (const sport of IN_SEASON_SPORTS) {
       const sportKey = SPORT_KEYS[sport];

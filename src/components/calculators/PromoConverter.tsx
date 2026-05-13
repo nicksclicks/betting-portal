@@ -5,7 +5,8 @@ import { OddsInput } from '../shared/OddsInput';
 import { calculatePromoConversion, formatCurrency, formatOdds } from '../../utils/odds';
 import { ALL_SPORTSBOOKS, Sportsbook } from '../../constants/sportsbooks';
 import { getMockOddsApiPayload } from '../../data/mockOdds';
-import { isLocalMockMode } from '../../lib/supabase';
+import { fetchOddsRows, oddsRowsToApiGames } from '../../lib/oddsFromSupabase';
+import { isLocalMockMode, supabase } from '../../lib/supabase';
 
 interface PromoOpportunity {
   gameId: string;
@@ -88,20 +89,8 @@ export function PromoConverter() {
       if (isLocalMockMode) {
         games = getMockOddsApiPayload().games as ApiGame[];
       } else {
-        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-odds`;
-        const response = await fetch(apiUrl, {
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch odds');
-        }
-
-        const data = await response.json();
-        games = data.games || [];
+        const rows = await fetchOddsRows(supabase);
+        games = oddsRowsToApiGames(rows) as ApiGame[];
       }
       const amount = parseFloat(scanAmount);
       const results: PromoOpportunity[] = [];

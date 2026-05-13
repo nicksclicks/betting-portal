@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { User, Mail, Calendar, Shield, UserPlus, Trash2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Shield, UserPlus, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { UserManagementMobileCard } from './UserManagementMobileCard';
 
 interface UserData {
@@ -11,23 +12,41 @@ interface UserData {
   created_at: string;
 }
 
+function roleLabel(role: 'admin' | 'user') {
+  return role === 'admin' ? 'Admin' : 'Basic';
+}
+
 export function SettingsPage() {
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const { profile, refreshProfile, isAdmin, isLocalMock } = useAuth();
+  const currentUser = profile;
+
   const [users, setUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
   const [addingUser, setAddingUser] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [adminActionError, setAdminActionError] = useState<string | null>(null);
+
+  const [editName, setEditName] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (!currentUser) return;
+    setEditName(currentUser.name);
+  }, [currentUser]);
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const fetchUsersList = useCallback(async () => {
+    if (!isAdmin || isLocalMock) {
+      setUsers([]);
+      return;
+    }
+    setListLoading(true);
     try {
       const { data, error } = await supabase
         .from('users')
@@ -35,60 +54,70 @@ export function SettingsPage() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-
-      if (data && data.length > 0) {
-        const adminUser = data.find(u => u.role === 'admin') || data[0];
-        setCurrentUser(adminUser);
-        setUsers(data);
-      } else {
-        const defaultAdmin: UserData = {
-          id: 'default-admin',
-          name: 'Admin User',
-          email: 'admin@example.com',
-          role: 'admin',
-          created_at: new Date().toISOString(),
-        };
-        setCurrentUser(defaultAdmin);
-        setUsers([defaultAdmin]);
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      const defaultAdmin: UserData = {
-        id: 'default-admin',
-        name: 'Admin User',
-        email: 'admin@example.com',
-        role: 'admin',
-        created_at: new Date().toISOString(),
-      };
-      setCurrentUser(defaultAdmin);
-      setUsers([defaultAdmin]);
+      setUsers((data as UserData[]) ?? []);
+    } catch (e) {
+      console.error('Error fetching users:', e);
+      setUsers([]);
     } finally {
-      setLoading(false);
+      setListLoading(false);
     }
-  };
+  }, [isAdmin, isLocalMock]);
+
+  useEffect(() => {
+    void fetchUsersList();
+  }, [fetchUsersList, currentUser?.id]);
 
   const handleAddUser = async () => {
-    if (!newUserName.trim() || !newUserEmail.trim()) return;
+    setAdminActionError(null);
+
+    if (isLocalMock) {
+      setAdminActionError(
+        'Inviting users needs a real Supabase project. Set VITE_LOCAL_MOCK=false in .env and restart the dev server.'
+      );
+      return;
+    }
+    if (!newUserName.trim()) {
+      setAdminActionError('Please enter a name.');
+      return;
+    }
+    if (!newUserEmail.trim()) {
+      setAdminActionError('Please enter an email.');
+      return;
+    }
+    if (!newUserPassword) {
+      setAdminActionError('Please enter a temporary password.');
+      return;
+    }
 
     setAddingUser(true);
     try {
-      const { error } = await supabase
-        .from('users')
-        .insert({
-          name: newUserName.trim(),
+      const { data, error } = await supabase.functions.invoke<{ error?: string }>('admin-invite-user', {
+        body: {
           email: newUserEmail.trim(),
+          password: newUserPassword,
+          name: newUserName.trim(),
           role: newUserRole,
-        });
+        },
+      });
 
-      if (error) throw error;
+      if (error) {
+        setAdminActionError(error.message);
+        return;
+      }
+      if (data && typeof data === 'object' && 'error' in data && data.error) {
+        setAdminActionError(String(data.error));
+        return;
+      }
 
       setNewUserName('');
       setNewUserEmail('');
+      setNewUserPassword('');
       setNewUserRole('user');
       setShowAddUser(false);
-      fetchUsers();
-    } catch (error) {
-      console.error('Error adding user:', error);
+      await fetchUsersList();
+    } catch (e) {
+      console.error('Error adding user:', e);
+      setAdminActionError('Could not create user. Deploy admin-invite-user and check logs.');
     } finally {
       setAddingUser(false);
     }
@@ -98,18 +127,62 @@ export function SettingsPage() {
     if (userId === currentUser?.id) return;
 
     setDeletingUserId(userId);
+    setAdminActionError(null);
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId);
+      const { data, error } = await supabase.functions.invoke<{ error?: string }>('admin-delete-user', {
+        body: { userId },
+      });
 
-      if (error) throw error;
-      fetchUsers();
-    } catch (error) {
-      console.error('Error removing user:', error);
+      if (error) {
+        setAdminActionError(error.message);
+        return;
+      }
+      if (data && typeof data === 'object' && 'error' in data && data.error) {
+        setAdminActionError(String(data.error));
+        return;
+      }
+
+      await fetchUsersList();
+    } catch (e) {
+      console.error('Error removing user:', e);
+      setAdminActionError('Could not remove user. Deploy admin-delete-user and check logs.');
     } finally {
       setDeletingUserId(null);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!currentUser) return;
+    setProfileError(null);
+    setProfileMessage(null);
+
+    if (isLocalMock) {
+      setProfileMessage('Profile editing is not persisted in local mock mode.');
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const name = editName.trim();
+      if (!name) {
+        setProfileError('Name is required.');
+        return;
+      }
+
+      const { error: dbErr } = await supabase
+        .from('users')
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq('id', currentUser.id);
+
+      if (dbErr) {
+        setProfileError(dbErr.message);
+        return;
+      }
+
+      setProfileMessage('Profile updated.');
+      await refreshProfile();
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -121,9 +194,7 @@ export function SettingsPage() {
     });
   };
 
-  const isAdmin = currentUser?.role === 'admin';
-
-  if (loading) {
+  if (!currentUser) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
@@ -142,57 +213,51 @@ export function SettingsPage() {
 
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="card">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="feature-icon">
-              <User className="w-5 h-5" />
+          <h2 className="text-lg font-semibold text-white text-center mb-6">Profile Information</h2>
+
+          <div className="max-w-xl mx-auto w-full space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="label" htmlFor="profile-name">
+                  Name
+                </label>
+                <input
+                  id="profile-name"
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="input-field"
+                  autoComplete="name"
+                />
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Profile Information</h2>
-              <p className="text-neutral-500 text-sm">Your account details</p>
+
+            {profileError && (
+              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                {profileError}
+              </p>
+            )}
+            {profileMessage && (
+              <p className="text-sm text-lime-400 bg-lime-500/10 border border-lime-500/20 rounded-lg px-3 py-2">
+                {profileMessage}
+              </p>
+            )}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm min-w-0">
+                <span className="text-xs text-neutral-500">Member since</span>
+                <span className="text-white font-medium">{formatDate(currentUser.created_at)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleSaveProfile()}
+                disabled={savingProfile}
+                className="self-end sm:self-auto shrink-0 rounded-full border border-lime-500/30 bg-black px-4 py-2 text-sm font-medium text-lime-400 transition-colors hover:border-lime-400/50 disabled:pointer-events-none disabled:opacity-40"
+              >
+                {savingProfile ? 'Saving…' : 'Save changes'}
+              </button>
             </div>
           </div>
-
-          {currentUser && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <User className="w-5 h-5 text-neutral-400" />
-                <div>
-                  <p className="text-xs text-neutral-500 mb-1">Name</p>
-                  <p className="text-white font-medium">{currentUser.name}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <Mail className="w-5 h-5 text-neutral-400" />
-                <div>
-                  <p className="text-xs text-neutral-500 mb-1">Email</p>
-                  <p className="text-white font-medium">{currentUser.email}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <Calendar className="w-5 h-5 text-neutral-400" />
-                <div>
-                  <p className="text-xs text-neutral-500 mb-1">Member Since</p>
-                  <p className="text-white font-medium">{formatDate(currentUser.created_at)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <Shield className="w-5 h-5 text-neutral-400" />
-                <div>
-                  <p className="text-xs text-neutral-500 mb-1">Role</p>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    currentUser.role === 'admin'
-                      ? 'bg-lime-500/10 text-lime-400 border border-lime-500/20'
-                      : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                  }`}>
-                    {currentUser.role === 'admin' ? 'Administrator' : 'User'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {isAdmin && (
@@ -204,7 +269,6 @@ export function SettingsPage() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-white">User Management</h2>
-                  <p className="text-neutral-500 text-sm">Add or remove users from the system</p>
                 </div>
               </div>
               <button
@@ -213,14 +277,20 @@ export function SettingsPage() {
                 className="btn-primary flex items-center justify-center gap-2 w-full md:w-auto shrink-0"
               >
                 <UserPlus className="w-4 h-4" />
-                Add User
+                Invite user
               </button>
             </div>
 
+            {adminActionError && (
+              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mb-4">
+                {adminActionError}
+              </p>
+            )}
+
             {showAddUser && (
               <div className="mb-6 p-5 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <h3 className="text-white font-medium mb-4">Add New User</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <h3 className="text-white font-medium mb-4">Invite user</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="label">Name</label>
                     <input
@@ -242,18 +312,29 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
+                    <label className="label">Temporary password</label>
+                    <input
+                      type="password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="input-field"
+                      placeholder="Temporary password"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
                     <label className="label">Role</label>
                     <select
                       value={newUserRole}
                       onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'user')}
                       className="select-field"
                     >
-                      <option value="user">User</option>
+                      <option value="user">Basic</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
                 </div>
-                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+                <div className="relative z-10 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pb-2 sm:pb-0">
                   <button
                     type="button"
                     onClick={() => setShowAddUser(false)}
@@ -263,84 +344,96 @@ export function SettingsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleAddUser}
-                    disabled={addingUser || !newUserName.trim() || !newUserEmail.trim()}
-                    className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
+                    onClick={() => void handleAddUser()}
+                    disabled={addingUser}
+                    className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {addingUser ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Adding...
+                        Creating…
                       </>
                     ) : (
-                      'Add User'
+                      'Create user'
                     )}
                   </button>
                 </div>
               </div>
             )}
 
-            <div className="md:hidden border-t border-neutral-800 -mx-4 px-4 sm:-mx-6 sm:px-6">
-              {users.map((user) => (
-                <UserManagementMobileCard
-                  key={user.id}
-                  user={user}
-                  currentUserId={currentUser?.id ?? null}
-                  deletingUserId={deletingUserId}
-                  onRemove={handleRemoveUser}
-                />
-              ))}
-            </div>
-
-            <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
-              <table className="w-full min-w-[640px]">
-                <thead>
-                  <tr className="border-b border-neutral-800">
-                    <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Name</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Email</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Role</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Member Since</th>
-                    <th className="text-right py-3 px-3 text-xs font-medium text-neutral-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
+            {listLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
+              </div>
+            ) : (
+              <>
+                <div className="md:hidden border-t border-neutral-800 -mx-4 px-4 sm:-mx-6 sm:px-6">
                   {users.map((user) => (
-                    <tr key={user.id} className="border-b border-neutral-800/50">
-                      <td className="py-3 px-3 text-sm text-white">{user.name}</td>
-                      <td className="py-3 px-3 text-sm text-neutral-400">{user.email}</td>
-                      <td className="py-3 px-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.role === 'admin'
-                            ? 'bg-lime-500/10 text-lime-400 border border-lime-500/20'
-                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                        }`}>
-                          {user.role === 'admin' ? 'Admin' : 'User'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-sm text-neutral-400">
-                        {formatDate(user.created_at)}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        {user.id !== currentUser?.id && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveUser(user.id)}
-                            disabled={deletingUserId === user.id}
-                            className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                          >
-                            {deletingUserId === user.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                    <UserManagementMobileCard
+                      key={user.id}
+                      user={user}
+                      currentUserId={currentUser?.id ?? null}
+                      deletingUserId={deletingUserId}
+                      onRemove={handleRemoveUser}
+                      roleLabel={roleLabel}
+                    />
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
+                  <table className="w-full min-w-[640px]">
+                    <thead>
+                      <tr className="border-b border-neutral-800">
+                        <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Name</th>
+                        <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Email</th>
+                        <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Role</th>
+                        <th className="text-left py-3 px-3 text-xs font-medium text-neutral-500">Member Since</th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-neutral-500">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id} className="border-b border-neutral-800/50">
+                          <td className="py-3 px-3 text-sm text-white">{user.name}</td>
+                          <td className="py-3 px-3 text-sm text-neutral-400">{user.email}</td>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                user.role === 'admin'
+                                  ? 'bg-lime-500/10 text-lime-400 border border-lime-500/20'
+                                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                              }`}
+                            >
+                              {roleLabel(user.role)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-sm text-neutral-400">
+                            {formatDate(user.created_at)}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            {user.id !== currentUser?.id && (
+                              <button
+                                type="button"
+                                onClick={() => void handleRemoveUser(user.id)}
+                                disabled={deletingUserId === user.id || isLocalMock}
+                                className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Remove user"
+                              >
+                                {deletingUserId === user.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
