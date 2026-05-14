@@ -9,6 +9,7 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -28,13 +29,19 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
           setError('Please enter your name.');
           return;
         }
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.');
+          return;
+        }
         const res = await signUp(email, password, name);
         if (res.error) setError(res.error);
         else if (res.needsEmailConfirm) {
           setMessage('Check your email to confirm your account, then sign in.');
+          setConfirmPassword('');
           setMode('signin');
         } else {
           setMessage('Account created. You can sign in.');
+          setConfirmPassword('');
           setMode('signin');
         }
       }
@@ -74,7 +81,12 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
           <div className="flex rounded-lg border border-neutral-800 p-0.5 mb-6">
             <button
               type="button"
-              onClick={() => { setMode('signin'); setError(null); setMessage(null); }}
+              onClick={() => {
+                setMode('signin');
+                setError(null);
+                setMessage(null);
+                setConfirmPassword('');
+              }}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                 mode === 'signin' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'
               }`}
@@ -83,7 +95,12 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
             </button>
             <button
               type="button"
-              onClick={() => { setMode('signup'); setError(null); setMessage(null); }}
+              onClick={() => {
+                setMode('signup');
+                setError(null);
+                setMessage(null);
+                setConfirmPassword('');
+              }}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                 mode === 'signup' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'
               }`}
@@ -150,6 +167,23 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
                 </div>
               )}
             </div>
+            {mode === 'signup' && (
+              <div>
+                <label className="label" htmlFor="auth-confirm-password">
+                  Confirm password
+                </label>
+                <input
+                  id="auth-confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="Re-enter password"
+                  required
+                />
+              </div>
+            )}
 
             {error && (
               <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
