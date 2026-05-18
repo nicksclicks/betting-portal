@@ -19,8 +19,6 @@ const SPORT_KEYS: Record<string, string> = {
   "Tennis": "tennis_atp_aus_open",
 };
 
-const IN_SEASON_SPORTS = ["Basketball", "Hockey"];
-
 const BOOKMAKER_MAP: Record<string, string> = {
   "betonlineag": "BetOnline",
   "bovada": "Bovada",
@@ -105,13 +103,10 @@ Deno.serve(async (req: Request) => {
 
     const allOddsData: { sport: string; events: OddsApiEvent[] }[] = [];
 
-    for (const sport of IN_SEASON_SPORTS) {
-      const sportKey = SPORT_KEYS[sport];
-      if (sportKey) {
-        const events = await fetchOddsForSport(sportKey, sport);
-        if (events.length > 0) {
-          allOddsData.push({ sport, events });
-        }
+    for (const [sport, sportKey] of Object.entries(SPORT_KEYS)) {
+      const events = await fetchOddsForSport(sportKey, sport);
+      if (events.length > 0) {
+        allOddsData.push({ sport, events });
       }
     }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { LegalDisclaimer } from '../legal/LegalDisclaimer';
 
 interface ForgotPasswordPageProps {
   onNavigate: (path: string, replace?: boolean) => void;
@@ -86,6 +87,7 @@ export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
             Back to sign in
           </button>
         </div>
+        <LegalDisclaimer className="mt-8 max-w-md mx-auto text-center px-1" />
       </div>
     </div>
   );

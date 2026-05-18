@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Activity, RefreshCw, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Activity, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { SPORTS, MARKET_TYPES, ALL_SPORTSBOOKS, Sport, MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { GameOdds, getMockOddsApiPayload } from '../../data/mockOdds';
 import {
   fetchOddsRows,
-  maxUpdatedAtFromRows,
   oddsRowsToApiGames,
   refreshOddsViaEdgeFunction,
   type OddsApiGame,
 } from '../../lib/oddsFromSupabase';
+import { canInvokeOddsEdgeSync, readLastOddsEdgeSync, writeLastOddsEdgeSync } from '../../lib/oddsEdgeSync';
 import { isLocalMockMode, supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
@@ -76,23 +76,47 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [maxLossPercent, setMaxLossPercent] = useState(4);
   const [games, setGames] = useState<GameOdds[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [lastLiveSync, setLastLiveSync] = useState<Date | null>(() => readLastOddsEdgeSync());
   const [sortByBestPercent, setSortByBestPercent] = useState(false);
 
-  const loadOddsFromDatabase = useCallback(async () => {
+  const performOddsLoad = useCallback(async (signal?: AbortSignal) => {
+    const gone = () => signal?.aborted ?? false;
+
     setLoading(true);
     try {
       if (isLocalMockMode) {
         const data = getMockOddsApiPayload();
+        if (gone()) return;
         setGames(transformApiGames(data.games as OddsApiGame[]));
-        setLastUpdated(new Date(data.updated));
+        setLastLiveSync(new Date(data.updated));
         return;
       }
 
-      const rows = await fetchOddsRows(supabase);
-      const apiGames = oddsRowsToApiGames(rows);
-      setGames(transformApiGames(apiGames));
-      setLastUpdated(maxUpdatedAtFromRows(rows));
+      if (canInvokeOddsEdgeSync()) {
+        try {
+          const { games: apiGames, updated } = await refreshOddsViaEdgeFunction();
+          if (gone()) return;
+          const syncTime = new Date(updated);
+          writeLastOddsEdgeSync(syncTime);
+          setLastLiveSync(syncTime);
+          if (apiGames.length > 0) {
+            setGames(transformApiGames(apiGames));
+          } else {
+            const rows = await fetchOddsRows(supabase);
+            if (gone()) return;
+            setGames(transformApiGames(oddsRowsToApiGames(rows)));
+          }
+        } catch (error) {
+          console.error('Error refreshing odds:', error);
+          const rows = await fetchOddsRows(supabase);
+          if (gone()) return;
+          setGames(transformApiGames(oddsRowsToApiGames(rows)));
+        }
+      } else {
+        const rows = await fetchOddsRows(supabase);
+        if (gone()) return;
+        setGames(transformApiGames(oddsRowsToApiGames(rows)));
+      }
     } catch (error) {
       console.error('Error loading odds from database:', error);
     } finally {
@@ -100,31 +124,11 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     }
   }, []);
 
-  const refreshOddsFromEdge = useCallback(async () => {
-    setLoading(true);
-    try {
-      if (isLocalMockMode) {
-        const data = getMockOddsApiPayload();
-        setGames(transformApiGames(data.games as OddsApiGame[]));
-        setLastUpdated(new Date(data.updated));
-        return;
-      }
-
-      const { games, updated } = await refreshOddsViaEdgeFunction();
-      if (games.length > 0) {
-        setGames(transformApiGames(games));
-        setLastUpdated(new Date(updated));
-      }
-    } catch (error) {
-      console.error('Error refreshing odds:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    loadOddsFromDatabase();
-  }, [loadOddsFromDatabase]);
+    const ac = new AbortController();
+    void performOddsLoad(ac.signal);
+    return () => ac.abort();
+  }, [performOddsLoad]);
 
   const gamesWithBestPercent = useMemo(() => {
     return games.map((game) => ({
@@ -193,31 +197,24 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       <div className="text-center max-w-2xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 md:mb-4">Low Hold</h1>
         <p className="text-neutral-400 text-sm md:text-base">
-          Compare odds across multiple sportsbooks in real-time.
-          Click any line to auto-fill the arbitrage calculator.
+          Compare odds across sportsbooks. Use Refresh to reload from the database; a live upstream sync runs at most
+          once per minute per browser.
         </p>
       </div>
 
-      <div className="hidden md:grid grid-cols-3 gap-8 max-w-3xl mx-auto">
+      <div className="hidden md:grid grid-cols-2 gap-8 max-w-2xl mx-auto">
         <div className="text-center">
           <div className="feature-icon mx-auto mb-4">
             <Activity className="w-5 h-5" />
           </div>
-          <h3 className="text-white font-medium mb-1">Real-Time Updates</h3>
-          <p className="text-neutral-500 text-sm">Live odds from multiple books</p>
-        </div>
-        <div className="text-center">
-          <div className="feature-icon mx-auto mb-4">
-            <RefreshCw className="w-5 h-5" />
-          </div>
-          <h3 className="text-white font-medium mb-1">Auto-Refresh</h3>
-          <p className="text-neutral-500 text-sm">Always current pricing</p>
+          <h3 className="text-white font-medium mb-1">Multiple books</h3>
+          <p className="text-neutral-500 text-sm">Compare lines in one view</p>
         </div>
         <div className="text-center">
           <div className="feature-icon mx-auto mb-4">
             <SlidersHorizontal className="w-5 h-5" />
           </div>
-          <h3 className="text-white font-medium mb-1">Custom Filters</h3>
+          <h3 className="text-white font-medium mb-1">Custom filters</h3>
           <p className="text-neutral-500 text-sm">Focus on what matters</p>
         </div>
       </div>
@@ -234,18 +231,19 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             </button>
             <button
               type="button"
-              onClick={refreshOddsFromEdge}
+              onClick={() => void performOddsLoad()}
               disabled={loading}
               className={`touch-manipulation btn-secondary text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
           </div>
-          <p className="text-xs md:text-sm text-neutral-500 text-center px-2">
-            {lastUpdated
-              ? `Updated: ${lastUpdated.toLocaleTimeString()}`
-              : 'Tap odds to fill calculator'}
-          </p>
+          <div className="text-xs md:text-sm text-neutral-500 text-center px-2 space-y-0.5">
+            <p>
+              {lastLiveSync ? `Last live sync: ${lastLiveSync.toLocaleString()}` : 'Last live sync: —'}
+            </p>
+            <p>Tap odds to fill calculator</p>
+          </div>
         </div>
 
         {showFilters && (

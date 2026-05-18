@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { LegalDisclaimer } from '../legal/LegalDisclaimer';
 
 type Mode = 'signin' | 'signup';
 
@@ -202,6 +203,7 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
             </button>
           </form>
         </div>
+        <LegalDisclaimer className="mt-8 max-w-md mx-auto text-center px-1" />
       </div>
     </div>
   );

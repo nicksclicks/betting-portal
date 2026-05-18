@@ -144,6 +144,13 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+  private: {
+    Tables: Record<string, never>;
+    Views: Record<string, never>;
     Functions: {
       is_admin: {
         Args: { check_uid?: string };

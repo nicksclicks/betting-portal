@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { LegalDisclaimer } from '../legal/LegalDisclaimer';
 
 interface ResetPasswordPageProps {
   onNavigate: (path: string, replace?: boolean) => void;
@@ -151,6 +152,7 @@ export function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps) {
             </button>
           </form>
         </div>
+        <LegalDisclaimer className="mt-8 max-w-md mx-auto text-center px-1" />
       </div>
     </div>
   );
