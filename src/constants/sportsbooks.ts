@@ -1,16 +1,7 @@
-export const OFFSHORE_SPORTSBOOKS = [
-  'Bookmaker',
-  'Bovada',
-  'BetOnline',
-  'Jazz Sports',
-  'BetDSI',
-  'BetNow',
-  'MyBookie',
-  'BetWhale',
-  'EveryGame',
-  'Rebet',
-] as const;
+/** Offshore-style books available from The Odds API (us region). */
+export const OFFSHORE_SPORTSBOOKS = ['Bovada', 'BetOnline', 'MyBookie'] as const;
 
+/** US books from The Odds API (us, us2, and us_ex regions). */
 export const US_SPORTSBOOKS = [
   'NoVig',
   'Fliff',
@@ -19,8 +10,8 @@ export const US_SPORTSBOOKS = [
   'BetMGM',
   'Caesars',
   'BetRivers',
-  'bet365',
   'ESPN BET',
+  'Rebet',
 ] as const;
 
 export const ALL_SPORTSBOOKS = [...OFFSHORE_SPORTSBOOKS, ...US_SPORTSBOOKS] as const;

@@ -17,7 +17,7 @@ export interface GameOdds {
 }
 
 /** Six books used in mock grids — fixed American odds per side. */
-type MockBook = 'Bookmaker' | 'Bovada' | 'BetOnline' | 'FanDuel' | 'DraftKings' | 'BetMGM';
+type MockBook = 'Bovada' | 'BetOnline' | 'FanDuel' | 'DraftKings' | 'BetMGM' | 'BetRivers';
 
 function bk(o: Record<MockBook, number>): Record<Sportsbook, number> {
   return o as Record<Sportsbook, number>;
@@ -33,7 +33,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: -142,
+          BetRivers: -142,
           Bovada: -145,
           BetOnline: -143,
           FanDuel: -148,
@@ -41,7 +41,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -145,
         }),
         away: bk({
-          Bookmaker: 122,
+          BetRivers: 122,
           Bovada: 125,
           BetOnline: 123,
           FanDuel: 128,
@@ -51,7 +51,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       'Point Spread': {
         home: bk({
-          Bookmaker: -112,
+          BetRivers: -112,
           Bovada: -110,
           BetOnline: -111,
           FanDuel: -115,
@@ -59,7 +59,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -110,
         }),
         away: bk({
-          Bookmaker: -108,
+          BetRivers: -108,
           Bovada: -110,
           BetOnline: -109,
           FanDuel: -105,
@@ -70,7 +70,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       Totals: {
         home: bk({
-          Bookmaker: -115,
+          BetRivers: -115,
           Bovada: -110,
           BetOnline: -112,
           FanDuel: -118,
@@ -78,7 +78,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -111,
         }),
         away: bk({
-          Bookmaker: -105,
+          BetRivers: -105,
           Bovada: -110,
           BetOnline: -108,
           FanDuel: -104,
@@ -98,7 +98,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: -175,
+          BetRivers: -175,
           Bovada: -180,
           BetOnline: -178,
           FanDuel: -185,
@@ -106,7 +106,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -180,
         }),
         away: bk({
-          Bookmaker: 148,
+          BetRivers: 148,
           Bovada: 155,
           BetOnline: 152,
           FanDuel: 158,
@@ -116,7 +116,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       'Point Spread': {
         home: bk({
-          Bookmaker: -113,
+          BetRivers: -113,
           Bovada: -110,
           BetOnline: -111,
           FanDuel: -114,
@@ -124,7 +124,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -110,
         }),
         away: bk({
-          Bookmaker: -107,
+          BetRivers: -107,
           Bovada: -110,
           BetOnline: -109,
           FanDuel: -106,
@@ -144,7 +144,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: -132,
+          BetRivers: -132,
           Bovada: -135,
           BetOnline: -133,
           FanDuel: -138,
@@ -152,7 +152,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -135,
         }),
         away: bk({
-          Bookmaker: 112,
+          BetRivers: 112,
           Bovada: 115,
           BetOnline: 113,
           FanDuel: 118,
@@ -162,7 +162,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       'Point Spread': {
         home: bk({
-          Bookmaker: -111,
+          BetRivers: -111,
           Bovada: -110,
           BetOnline: -110,
           FanDuel: -112,
@@ -170,7 +170,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -110,
         }),
         away: bk({
-          Bookmaker: -109,
+          BetRivers: -109,
           Bovada: -110,
           BetOnline: -110,
           FanDuel: -108,
@@ -181,7 +181,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       Totals: {
         home: bk({
-          Bookmaker: -112,
+          BetRivers: -112,
           Bovada: -110,
           BetOnline: -111,
           FanDuel: -115,
@@ -189,7 +189,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -110,
         }),
         away: bk({
-          Bookmaker: -108,
+          BetRivers: -108,
           Bovada: -110,
           BetOnline: -109,
           FanDuel: -105,
@@ -209,7 +209,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: 108,
+          BetRivers: 108,
           Bovada: 105,
           BetOnline: 106,
           FanDuel: 102,
@@ -217,7 +217,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: 105,
         }),
         away: bk({
-          Bookmaker: -128,
+          BetRivers: -128,
           Bovada: -125,
           BetOnline: -126,
           FanDuel: -122,
@@ -227,7 +227,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       'Point Spread': {
         home: bk({
-          Bookmaker: -110,
+          BetRivers: -110,
           Bovada: -110,
           BetOnline: -109,
           FanDuel: -112,
@@ -235,7 +235,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -110,
         }),
         away: bk({
-          Bookmaker: -110,
+          BetRivers: -110,
           Bovada: -110,
           BetOnline: -111,
           FanDuel: -108,
@@ -255,7 +255,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: -128,
+          BetRivers: -128,
           Bovada: -130,
           BetOnline: -129,
           FanDuel: -134,
@@ -263,7 +263,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -130,
         }),
         away: bk({
-          Bookmaker: 108,
+          BetRivers: 108,
           Bovada: 110,
           BetOnline: 109,
           FanDuel: 114,
@@ -273,7 +273,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       Totals: {
         home: bk({
-          Bookmaker: -114,
+          BetRivers: -114,
           Bovada: -110,
           BetOnline: -112,
           FanDuel: -116,
@@ -281,7 +281,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -111,
         }),
         away: bk({
-          Bookmaker: -106,
+          BetRivers: -106,
           Bovada: -110,
           BetOnline: -108,
           FanDuel: -104,
@@ -301,7 +301,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: -112,
+          BetRivers: -112,
           Bovada: -115,
           BetOnline: -114,
           FanDuel: -118,
@@ -309,7 +309,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -115,
         }),
         away: bk({
-          Bookmaker: -102,
+          BetRivers: -102,
           Bovada: -105,
           BetOnline: -104,
           FanDuel: -100,
@@ -319,7 +319,7 @@ export const MOCK_GAMES: GameOdds[] = [
       },
       Totals: {
         home: bk({
-          Bookmaker: -113,
+          BetRivers: -113,
           Bovada: -110,
           BetOnline: -111,
           FanDuel: -114,
@@ -327,7 +327,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -110,
         }),
         away: bk({
-          Bookmaker: -107,
+          BetRivers: -107,
           Bovada: -110,
           BetOnline: -109,
           FanDuel: -106,
@@ -347,7 +347,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: -122,
+          BetRivers: -122,
           Bovada: -125,
           BetOnline: -124,
           FanDuel: -128,
@@ -355,7 +355,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: -125,
         }),
         away: bk({
-          Bookmaker: 340,
+          BetRivers: 340,
           Bovada: 350,
           BetOnline: 345,
           FanDuel: 360,
@@ -374,7 +374,7 @@ export const MOCK_GAMES: GameOdds[] = [
     odds: {
       'Money Line': {
         home: bk({
-          Bookmaker: 128,
+          BetRivers: 128,
           Bovada: 130,
           BetOnline: 129,
           FanDuel: 125,
@@ -382,7 +382,7 @@ export const MOCK_GAMES: GameOdds[] = [
           BetMGM: 130,
         }),
         away: bk({
-          Bookmaker: -152,
+          BetRivers: -152,
           Bovada: -150,
           BetOnline: -151,
           FanDuel: -148,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Wallet, PiggyBank, TrendingUp, Download, Plus, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Deposit, DepositInsert, DepositUpdate } from '../../types/database';
 import { SportsbookSelect } from '../shared/SportsbookSelect';
@@ -11,6 +12,7 @@ import {
   parsePositiveDecimalInput,
   parsePositiveMoneyInput,
 } from '../../utils/formNumbers';
+import { saveErrorMessage } from '../../utils/supabaseSaveError';
 
 interface DepositFormData {
   sportsbook: string;
@@ -35,6 +37,7 @@ const createEmptyForm = (): DepositFormData => ({
 });
 
 export function DepositTracker() {
+  const { session } = useAuth();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -98,6 +101,12 @@ export function DepositTracker() {
       return;
     }
 
+    const userId = session?.user?.id;
+    if (!userId) {
+      setSubmitError('Sign in to save deposits.');
+      return;
+    }
+
     const payload: DepositInsert = {
       sportsbook: formData.sportsbook,
       deposit_amount: depositAmount,
@@ -106,7 +115,8 @@ export function DepositTracker() {
       rollover_multiplier: rolloverMultiplier,
       current_balance: currentBalance,
       status: formData.status,
-      notes: formData.notes || null,
+      notes: formData.notes.trim() || null,
+      user_id: userId,
     };
 
     setSubmitError(null);
@@ -121,14 +131,18 @@ export function DepositTracker() {
         .eq('id', editingId);
 
       if (error) {
-        setSubmitError('Could not save deposit. Check your inputs and try again.');
+        setSubmitError(
+          saveErrorMessage(error, 'Could not save deposit. Check your inputs and try again.')
+        );
         return;
       }
     } else {
       const { error } = await supabase.from('deposits').insert([payload]);
 
       if (error) {
-        setSubmitError('Could not save deposit. Check your inputs and try again.');
+        setSubmitError(
+          saveErrorMessage(error, 'Could not save deposit. Check your inputs and try again.')
+        );
         return;
       }
     }

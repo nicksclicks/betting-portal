@@ -10,6 +10,28 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  .scrollbar-table {
+    scrollbar-width: thin;
+    scrollbar-color: #404040 #000000;
+  }
+
+  .scrollbar-table::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+  }
+
+  .scrollbar-table::-webkit-scrollbar-track {
+    @apply bg-black;
+  }
+
+  .scrollbar-table::-webkit-scrollbar-thumb {
+    @apply bg-neutral-700 rounded-full;
+  }
+
+  .scrollbar-table::-webkit-scrollbar-thumb:hover {
+    @apply bg-neutral-600;
+  }
 }
 
 @layer base {

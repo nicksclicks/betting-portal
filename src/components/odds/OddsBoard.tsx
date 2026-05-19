@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Activity, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { SPORTS, MARKET_TYPES, ALL_SPORTSBOOKS, Sport, MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { GameOdds, getMockOddsApiPayload } from '../../data/mockOdds';
@@ -13,7 +13,9 @@ import { isLocalMockMode, supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
 import { calculateGameBestPercent } from '../../utils/bestPercent';
+import { gameHasSelectedMarketLines } from '../../utils/marketOdds';
 import { emptyGameSidePick, type GameSidePick } from './useOddsGameInteraction';
+import { SyncedHorizontalScroll } from '../shared/SyncedHorizontalScroll';
 
 interface OddsBoardProps {
   onOddsClick: (data: {
@@ -80,6 +82,24 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [lastLiveSync, setLastLiveSync] = useState<Date | null>(() => readLastOddsEdgeSync());
   const [sortByBestPercent, setSortByBestPercent] = useState(false);
   const [gamePicks, setGamePicks] = useState<Record<string, GameSidePick>>({});
+  const [syncedFilterKey, setSyncedFilterKey] = useState<string | null>(null);
+  const filterKeyRef = useRef('');
+
+  const currentFilterKey = useMemo(
+    () =>
+      JSON.stringify({
+        selectedSports,
+        marketFilter,
+        selectedBooks,
+        maxFavorite,
+        maxUnderdog,
+        maxLossPercent,
+      }),
+    [selectedSports, marketFilter, selectedBooks, maxFavorite, maxUnderdog, maxLossPercent]
+  );
+  filterKeyRef.current = currentFilterKey;
+
+  const filtersDirty = syncedFilterKey !== null && currentFilterKey !== syncedFilterKey;
 
   const getGamePick = useCallback(
     (gameId: string) => gamePicks[gameId] ?? emptyGameSidePick(),
@@ -96,54 +116,67 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     []
   );
 
-  const performOddsLoad = useCallback(async (signal?: AbortSignal) => {
-    const gone = () => signal?.aborted ?? false;
+  const performOddsLoad = useCallback(
+    async (options?: { signal?: AbortSignal; forceLiveSync?: boolean }) => {
+      const signal = options?.signal;
+      const forceLiveSync = options?.forceLiveSync ?? false;
+      const gone = () => signal?.aborted ?? false;
 
-    setLoading(true);
-    try {
-      if (isLocalMockMode) {
-        const data = getMockOddsApiPayload();
-        if (gone()) return;
-        setGames(transformApiGames(data.games as OddsApiGame[]));
-        setLastLiveSync(new Date(data.updated));
-        return;
-      }
-
-      if (canInvokeOddsEdgeSync()) {
-        try {
-          const { games: apiGames, updated } = await refreshOddsViaEdgeFunction();
+      setLoading(true);
+      let loadSucceeded = false;
+      try {
+        if (isLocalMockMode) {
+          const data = getMockOddsApiPayload();
           if (gone()) return;
-          const syncTime = new Date(updated);
-          writeLastOddsEdgeSync(syncTime);
-          setLastLiveSync(syncTime);
-          if (apiGames.length > 0) {
-            setGames(transformApiGames(apiGames));
-          } else {
+          setGames(transformApiGames(data.games as OddsApiGame[]));
+          setLastLiveSync(new Date(data.updated));
+          loadSucceeded = true;
+          return;
+        }
+
+        if (forceLiveSync || canInvokeOddsEdgeSync()) {
+          try {
+            const { games: apiGames, updated } = await refreshOddsViaEdgeFunction();
+            if (gone()) return;
+            const syncTime = new Date(updated);
+            writeLastOddsEdgeSync(syncTime);
+            setLastLiveSync(syncTime);
+            if (apiGames.length > 0) {
+              setGames(transformApiGames(apiGames));
+            } else {
+              const rows = await fetchOddsRows(supabase);
+              if (gone()) return;
+              setGames(transformApiGames(oddsRowsToApiGames(rows)));
+            }
+            loadSucceeded = true;
+          } catch (error) {
+            console.error('Error refreshing odds:', error);
             const rows = await fetchOddsRows(supabase);
             if (gone()) return;
             setGames(transformApiGames(oddsRowsToApiGames(rows)));
+            loadSucceeded = true;
           }
-        } catch (error) {
-          console.error('Error refreshing odds:', error);
+        } else {
           const rows = await fetchOddsRows(supabase);
           if (gone()) return;
           setGames(transformApiGames(oddsRowsToApiGames(rows)));
+          loadSucceeded = true;
         }
-      } else {
-        const rows = await fetchOddsRows(supabase);
-        if (gone()) return;
-        setGames(transformApiGames(oddsRowsToApiGames(rows)));
+      } catch (error) {
+        console.error('Error loading odds from database:', error);
+      } finally {
+        if (!gone() && loadSucceeded) {
+          setSyncedFilterKey(filterKeyRef.current);
+        }
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading odds from database:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     const ac = new AbortController();
-    void performOddsLoad(ac.signal);
+    void performOddsLoad({ signal: ac.signal });
     return () => ac.abort();
   }, [performOddsLoad]);
 
@@ -161,7 +194,9 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       filtered = filtered.filter((g) => selectedSports.includes(g.game.sport));
     }
 
-    filtered = filtered.filter((g) => g.game.odds[marketFilter]);
+    filtered = filtered.filter((g) =>
+      gameHasSelectedMarketLines(g.game, marketFilter, selectedBooks)
+    );
 
     if (sortByBestPercent) {
       filtered = [...filtered].sort((a, b) => {
@@ -176,7 +211,11 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     }
 
     return filtered;
-  }, [gamesWithBestPercent, selectedSports, marketFilter, sortByBestPercent]);
+  }, [gamesWithBestPercent, selectedSports, marketFilter, sortByBestPercent, selectedBooks]);
+
+  const tableMinWidth = useMemo(() => {
+    return 520 + selectedBooks.length * 80;
+  }, [selectedBooks.length]);
 
   const toggleBook = (book: Sportsbook) => {
     setSelectedBooks((prev) =>
@@ -214,8 +253,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       <div className="text-center max-w-2xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 md:mb-4">Low Hold</h1>
         <p className="text-neutral-400 text-sm md:text-base">
-          Compare odds across sportsbooks. Use Refresh to reload from the database; a live upstream sync runs at most
-          once per minute per browser.
+          Compare odds across sportsbooks. Refresh reloads from the database; a live upstream sync runs at most once
+          per minute, or immediately after you change filters and press Refresh.
         </p>
       </div>
 
@@ -248,9 +287,11 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             </button>
             <button
               type="button"
-              onClick={() => void performOddsLoad()}
+              onClick={() => void performOddsLoad({ forceLiveSync: filtersDirty })}
               disabled={loading}
-              className={`touch-manipulation btn-secondary text-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`touch-manipulation btn-secondary text-sm ${
+                loading ? 'opacity-50 cursor-not-allowed' : ''
+              } ${filtersDirty ? 'border-lime-500/50 text-lime-400 bg-lime-500/5' : ''}`}
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
@@ -259,6 +300,9 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             <p>
               {lastLiveSync ? `Last live sync: ${lastLiveSync.toLocaleString()}` : 'Last live sync: —'}
             </p>
+            {filtersDirty && (
+              <p className="text-lime-400/80">Filters changed — Refresh will pull fresh odds from the API</p>
+            )}
             <p>Pick one odds per row, then tap a row again to open Arbitrage</p>
           </div>
         </div>
@@ -430,8 +474,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                   />
                 ))}
               </div>
-              <div className="hidden md:block overflow-x-auto overscroll-x-contain touch-pan-x [scrollbar-width:thin]">
-                <table className="w-full min-w-[640px]">
+              <SyncedHorizontalScroll className="hidden md:block">
+                <table className="w-full" style={{ minWidth: tableMinWidth }}>
                   <thead>
                     <tr className="border-b border-neutral-800">
                       <th
@@ -492,7 +536,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </SyncedHorizontalScroll>
             </>
           )}
         </div>

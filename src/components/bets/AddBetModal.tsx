@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, ChevronDown } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { BetInsert } from '../../types/database';
 import { ALL_SPORTSBOOKS } from '../../constants/sportsbooks';
 import { parseAmericanOddsInput, parsePositiveMoneyInput } from '../../utils/formNumbers';
+import { saveErrorMessage } from '../../utils/supabaseSaveError';
 
 interface BetEntry {
   id: string;
@@ -33,6 +35,7 @@ const createEmptyBet = (): BetEntry => ({
 });
 
 export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetModalProps) {
+  const { session } = useAuth();
   const [bets, setBets] = useState<BetEntry[]>([createEmptyBet(), createEmptyBet()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -103,6 +106,12 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
     setIsSubmitting(true);
     const groupId = parsedBets.length > 1 ? crypto.randomUUID() : null;
 
+    const userId = session?.user?.id;
+    if (!userId) {
+      setSubmitError('Sign in to track bets.');
+      return;
+    }
+
     const betsToInsert: BetInsert[] = parsedBets.map(({ bet, odds, amountStaked }) => ({
       bet_name: bet.betName,
       sportsbook: bet.sportsbook,
@@ -111,6 +120,7 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
       is_bonus_bet: bet.isBonusBet,
       is_odds_boost: bet.isOddsBoost,
       group_id: groupId,
+      user_id: userId,
     }));
 
     const { error } = await supabase.from('bets').insert(betsToInsert);
@@ -118,7 +128,9 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
     setIsSubmitting(false);
 
     if (error) {
-      setSubmitError('Could not save bet. Check your inputs and try again.');
+      setSubmitError(
+        saveErrorMessage(error, 'Could not save bet. Check your inputs and try again.')
+      );
       return;
     }
 

@@ -62,7 +62,7 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
     setTotalStake('1000');
     setTeamA('Kansas City Chiefs');
     setOddsA('-145');
-    setBookA('Bookmaker');
+    setBookA('BetOnline');
     setTeamB('Buffalo Bills');
     setOddsB('+155');
     setBookB('DraftKings');

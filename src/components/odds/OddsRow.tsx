@@ -19,6 +19,9 @@ interface OddsRowProps {
   onPickChange: (update: (prev: GameSidePick) => GameSidePick) => void;
 }
 
+const bookCellClass =
+  'py-1.5 px-1 md:px-2 text-center align-middle min-w-[60px] md:min-w-[80px]';
+
 export function OddsRow({
   game,
   marketType,
@@ -42,47 +45,74 @@ export function OddsRow({
   if (!marketOdds) return null;
 
   const spreadLabel = getMarketSpreadLabel(marketType, marketOdds);
-  const oddsColSpan = selectedBooks.length + 1;
 
-  const renderOddsButtons = (isHome: boolean) =>
-    selectedBooks.map((book) => {
-      const odds = isHome ? marketOdds.home[book] : marketOdds.away[book];
-      const isBest = isHome ? bestLines?.home?.book === book : bestLines?.away?.book === book;
-      const isSelected = isHome ? selectedHomeBook === book : selectedAwayBook === book;
-      const team = isHome ? game.homeTeam : game.awayTeam;
+  const renderBookCell = (isHome: boolean, book: Sportsbook) => {
+    const odds = isHome ? marketOdds.home[book] : marketOdds.away[book];
+    const isBest = isHome ? bestLines?.home?.book === book : bestLines?.away?.book === book;
+    const isSelected = isHome ? selectedHomeBook === book : selectedAwayBook === book;
+    const team = isHome ? game.homeTeam : game.awayTeam;
 
-      return odds !== undefined ? (
-        <button
-          key={book}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleSideInteraction(isHome, { team, odds, book });
-          }}
-          className={`odds-cell flex-1 min-w-[52px] text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 ${
-            odds > 0 ? 'odds-positive' : 'odds-negative'
-          } ${isBest ? 'odds-cell-best' : ''} ${
-            isSelected && !isBest ? 'bg-neutral-700/40 ring-1 ring-neutral-500/50' : ''
-          }`}
-        >
-          {formatOdds(odds)}
-        </button>
-      ) : (
-        <span
-          key={book}
-          className="flex-1 min-w-[52px] flex items-center justify-center text-neutral-700 text-xs md:text-sm min-h-[44px]"
-        >
-          -
-        </span>
-      );
-    });
+    return (
+      <td key={book} className={bookCellClass}>
+        {odds !== undefined ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSideInteraction(isHome, { team, odds, book });
+            }}
+            className={`odds-cell w-full min-w-[52px] text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 ${
+              odds > 0 ? 'odds-positive' : 'odds-negative'
+            } ${isBest ? 'odds-cell-best' : ''} ${
+              isSelected && !isBest ? 'bg-neutral-700/40 ring-1 ring-neutral-500/50' : ''
+            }`}
+          >
+            {formatOdds(odds)}
+          </button>
+        ) : (
+          <span className="inline-flex w-full min-w-[52px] min-h-[44px] items-center justify-center text-neutral-700 text-xs md:text-sm">
+            -
+          </span>
+        )}
+      </td>
+    );
+  };
+
+  const renderBestCell = (isHome: boolean) => {
+    const line = isHome ? bestLines?.home : bestLines?.away;
+
+    return (
+      <td className={`${bookCellClass} min-w-[52px]`}>
+        {line ? (
+          <span className="inline-flex w-full min-h-[44px] items-center justify-center text-xs md:text-sm font-mono font-medium text-lime-400">
+            {formatOdds(line.odds)}
+          </span>
+        ) : (
+          <span className="inline-flex w-full min-h-[44px] items-center justify-center text-neutral-700 text-xs md:text-sm">
+            -
+          </span>
+        )}
+      </td>
+    );
+  };
 
   return (
     <>
       <tr className="border-b border-neutral-800/50">
         <td className="pt-2 md:pt-3 pb-0 pl-5 pr-2 md:px-4 sticky left-0 z-10 bg-neutral-950 border-r border-neutral-800 shadow-[6px_0_12px_-4px_rgba(0,0,0,0.65)] align-top min-w-[13rem] max-w-[15rem] sm:min-w-[14rem] sm:max-w-[17rem] md:min-w-[16rem] md:max-w-[22rem] lg:max-w-[26rem]">
           <div className="text-[10px] md:text-xs text-neutral-500 mb-2 md:mb-2.5">{game.sport}</div>
-          <div className="text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => handleSideInteraction(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleSideInteraction(false);
+              }
+            }}
+            className={`text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0 ${sideRowBoxClass()}`}
+          >
             <span className="text-neutral-500 text-[10px] md:text-xs shrink-0">A</span>
             <span className="text-neutral-700 shrink-0">|</span>
             <span className="truncate min-w-0 flex-1">{game.awayTeam}</span>
@@ -112,41 +142,11 @@ export function OddsRow({
             </div>
           )}
         </td>
-        <td colSpan={oddsColSpan} className="py-1.5 px-1 md:px-2 align-top">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => handleSideInteraction(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleSideInteraction(false);
-              }
-            }}
-            className={sideRowBoxClass()}
-          >
-            <div className="flex items-stretch gap-1 md:gap-1.5">
-              {renderOddsButtons(false)}
-              <div className="flex items-center justify-center min-w-[52px] px-1 md:px-2 shrink-0">
-                {bestLines?.away && (
-                  <span className="text-xs md:text-sm font-mono font-medium text-lime-400">
-                    {formatOdds(bestLines.away.odds)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </td>
+        {selectedBooks.map((book) => renderBookCell(false, book))}
+        {renderBestCell(false)}
       </tr>
       <tr className="border-b border-neutral-800">
-        <td className="pt-1.5 md:pt-2 pb-0 pl-5 pr-2 md:px-4 sticky left-0 z-10 bg-neutral-950 border-r border-neutral-800 shadow-[6px_0_12px_-4px_rgba(0,0,0,0.65)] align-top min-w-[13rem] max-w-[15rem] sm:min-w-[14rem] sm:max-w-[17rem] md:min-w-[16rem] md:max-w-[22rem] lg:max-w-[26rem]">
-          <div className="text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0">
-            <span className="text-neutral-500 text-[10px] md:text-xs shrink-0">H</span>
-            <span className="text-neutral-700 shrink-0">|</span>
-            <span className="truncate min-w-0 flex-1">{game.homeTeam}</span>
-          </div>
-        </td>
-        <td colSpan={oddsColSpan} className="py-1.5 px-1 md:px-2 align-top">
+        <td className="pt-1.5 md:pt-2 pb-2 pl-5 pr-2 md:px-4 sticky left-0 z-10 bg-neutral-950 border-r border-neutral-800 shadow-[6px_0_12px_-4px_rgba(0,0,0,0.65)] align-top min-w-[13rem] max-w-[15rem] sm:min-w-[14rem] sm:max-w-[17rem] md:min-w-[16rem] md:max-w-[22rem] lg:max-w-[26rem]">
           <div
             role="button"
             tabIndex={0}
@@ -157,22 +157,16 @@ export function OddsRow({
                 handleSideInteraction(true);
               }
             }}
-            className={sideRowBoxClass()}
+            className={`text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0 ${sideRowBoxClass()}`}
           >
-            <div className="flex items-stretch gap-1 md:gap-1.5">
-              {renderOddsButtons(true)}
-              <div className="flex items-center justify-center min-w-[52px] px-1 md:px-2 shrink-0">
-                {bestLines?.home && (
-                  <span className="text-xs md:text-sm font-mono font-medium text-lime-400">
-                    {formatOdds(bestLines.home.odds)}
-                  </span>
-                )}
-              </div>
-            </div>
+            <span className="text-neutral-500 text-[10px] md:text-xs shrink-0">H</span>
+            <span className="text-neutral-700 shrink-0">|</span>
+            <span className="truncate min-w-0 flex-1">{game.homeTeam}</span>
           </div>
         </td>
+        {selectedBooks.map((book) => renderBookCell(true, book))}
+        {renderBestCell(true)}
       </tr>
     </>
   );
 }
-

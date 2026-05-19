@@ -19,22 +19,26 @@ const SPORT_KEYS: Record<string, string> = {
   "Tennis": "tennis_atp_aus_open",
 };
 
+/** Maps Odds API bookmaker keys to display names in ALL_SPORTSBOOKS. */
 const BOOKMAKER_MAP: Record<string, string> = {
-  "betonlineag": "BetOnline",
-  "bovada": "Bovada",
-  "mybookieag": "MyBookie",
-  "fanduel": "FanDuel",
-  "draftkings": "DraftKings",
-  "betmgm": "BetMGM",
-  "caesars": "Caesars",
-  "betrivers": "BetRivers",
-  "pointsbetus": "PointsBet",
-  "unibet_us": "Unibet",
-  "williamhill_us": "Caesars",
-  "barstool": "ESPN BET",
-  "espnbet": "ESPN BET",
-  "bet365": "bet365",
+  betonlineag: "BetOnline",
+  bovada: "Bovada",
+  mybookieag: "MyBookie",
+  fanduel: "FanDuel",
+  draftkings: "DraftKings",
+  betmgm: "BetMGM",
+  caesars: "Caesars",
+  betrivers: "BetRivers",
+  williamhill_us: "Caesars",
+  barstool: "ESPN BET",
+  espnbet: "ESPN BET",
+  fliff: "Fliff",
+  rebet: "Rebet",
+  novig: "NoVig",
 };
+
+const ODDS_API_BOOKMAKERS = Object.keys(BOOKMAKER_MAP).join(",");
+const ALLOWED_SPORTSBOOKS = [...new Set(Object.values(BOOKMAKER_MAP))];
 
 interface OddsApiOutcome {
   name: string;
@@ -76,7 +80,7 @@ async function fetchOddsForSport(sportKey: string, sport: string): Promise<OddsA
   }
 
   try {
-    const url = `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=decimal`;
+    const url = `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&bookmakers=${ODDS_API_BOOKMAKERS}&markets=h2h,spreads,totals&oddsFormat=decimal`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -128,7 +132,8 @@ Deno.serve(async (req: Request) => {
     for (const { sport, events } of allOddsData) {
       for (const event of events) {
         for (const bookmaker of event.bookmakers) {
-          const sportsbookName = BOOKMAKER_MAP[bookmaker.key] || bookmaker.title;
+          const sportsbookName = BOOKMAKER_MAP[bookmaker.key];
+          if (!sportsbookName) continue;
 
           for (const market of bookmaker.markets) {
             let marketType = "Money Line";
@@ -157,6 +162,8 @@ Deno.serve(async (req: Request) => {
               awayOdds = underOutcome ? americanOdds(underOutcome.price) : null;
               total = overOutcome?.point || null;
             }
+
+            if (homeOdds === null && awayOdds === null) continue;
 
             oddsRecords.push({
               external_id: event.id,
@@ -187,10 +194,24 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const { error: cleanupError } = await supabase
+      .from("odds")
+      .delete()
+      .not(
+        "sportsbook",
+        "in",
+        `(${ALLOWED_SPORTSBOOKS.map((name) => `"${name}"`).join(",")})`
+      );
+
+    if (cleanupError) {
+      console.error("Error cleaning stale sportsbooks:", cleanupError);
+    }
+
     const { data: freshOdds, error: fetchError } = await supabase
       .from("odds")
       .select("*")
       .gte("game_time", new Date().toISOString())
+      .in("sportsbook", ALLOWED_SPORTSBOOKS)
       .order("game_time", { ascending: true });
 
     if (fetchError) {
@@ -207,6 +228,9 @@ Deno.serve(async (req: Request) => {
     }>();
 
     for (const record of freshOdds || []) {
+      if (!ALLOWED_SPORTSBOOKS.includes(record.sportsbook)) continue;
+      if (record.home_odds === null && record.away_odds === null) continue;
+
       const key = `${record.external_id}-${record.home_team}-${record.away_team}`;
 
       if (!gamesMap.has(key)) {

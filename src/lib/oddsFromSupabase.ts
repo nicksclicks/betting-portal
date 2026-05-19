@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ALL_SPORTSBOOKS } from '../constants/sportsbooks';
 import type { Database } from '../types/database';
 
 type OddsRow = Database['public']['Tables']['odds']['Row'];
@@ -98,6 +99,7 @@ export async function fetchOddsRows(supabase: SupabaseClient<Database>): Promise
       'sport, home_team, away_team, game_time, market_type, sportsbook, home_odds, away_odds, spread, total, external_id, updated_at'
     )
     .gte('game_time', new Date().toISOString())
+    .in('sportsbook', [...ALL_SPORTSBOOKS])
     .order('game_time', { ascending: true });
 
   if (error) throw error;
