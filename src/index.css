@@ -94,8 +94,9 @@
   }
 
   .odds-cell {
-    @apply px-3 py-2 text-center cursor-pointer rounded transition-colors touch-manipulation
+    @apply px-3 py-2 text-center cursor-pointer rounded transition-colors touch-manipulation select-none
            hover:bg-neutral-800 active:bg-neutral-800 text-sm font-medium;
+    touch-action: manipulation;
   }
 
   .odds-cell.odds-cell-best {

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { GameOdds } from '../../data/mockOdds';
 import { MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { BestPercentResult } from '../../utils/bestPercent';
@@ -78,6 +78,9 @@ export function useOddsGameInteraction(
   onOddsClick: (data: OddsClickPayload) => void
 ) {
   const marketOdds = game.odds[marketType];
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
+  const lastPointerActivationRef = useRef(0);
 
   const bestLines = useMemo(() => {
     if (!marketOdds) return null;
@@ -106,11 +109,12 @@ export function useOddsGameInteraction(
   const resolveNavigatePayload = (): OddsClickPayload | null => {
     if (!bestLines) return null;
 
-    const awaySide = pick.away
+    const currentPick = pickRef.current;
+    const awaySide = currentPick.away
       ?? (bestLines.away
         ? { team: game.awayTeam, odds: bestLines.away.odds, book: bestLines.away.book }
         : null);
-    const homeSide = pick.home
+    const homeSide = currentPick.home
       ?? (bestLines.home
         ? { team: game.homeTeam, odds: bestLines.home.odds, book: bestLines.home.book }
         : null);
@@ -127,48 +131,77 @@ export function useOddsGameInteraction(
     };
   };
 
-  const navigateToArbitrage = () => {
+  const navigateToArbitrage = useCallback(() => {
     const payload = resolveNavigatePayload();
     if (!payload) return;
 
+    pickRef.current = emptyGameSidePick();
     onPickChange(() => emptyGameSidePick());
     onOddsClick(payload);
-  };
+  }, [bestLines, game.awayTeam, game.homeTeam, onOddsClick, onPickChange]);
 
-  const handleSideInteraction = (
-    isHome: boolean,
-    cell: { team: string; odds: number; book: Sportsbook }
-  ) => {
-    if (!bestLines) return;
+  const activateOddsCell = useCallback(
+    (isHome: boolean, cell: OddsCellActivation) => {
+      if (!bestLines) return;
 
-    const sideKey = isHome ? 'home' : 'away';
-    const currentPick = pick[sideKey];
-    const isHighlighted = currentPick?.book === cell.book;
-    const isBestLine = isHome
-      ? bestLines.home?.book === cell.book
-      : bestLines.away?.book === cell.book;
+      const side: SideRow = isHome ? 'home' : 'away';
+      const sideKey = isHome ? 'home' : 'away';
+      const currentPick = pickRef.current[sideKey];
+      const isHighlighted = currentPick?.book === cell.book;
+      const isBestLine = isHome
+        ? bestLines.home?.book === cell.book
+        : bestLines.away?.book === cell.book;
 
-    if (isHighlighted) {
-      navigateToArbitrage();
-      return;
-    }
+      if (isHighlighted) {
+        navigateToArbitrage();
+        return;
+      }
 
-    onPickChange((prev) => ({
-      ...prev,
-      [sideKey]: {
-        book: cell.book,
-        odds: cell.odds,
-        team: cell.team,
-        source: isBestLine ? 'recommendation' : 'user',
+      const next: GameSidePick = {
+        ...pickRef.current,
+        [sideKey]: {
+          book: cell.book,
+          odds: cell.odds,
+          team: cell.team,
+          source: isBestLine ? 'recommendation' : 'user',
+        },
+      };
+      pickRef.current = next;
+      onPickChange(() => next);
+    },
+    [bestLines, navigateToArbitrage, onPickChange]
+  );
+
+  const bindOddsCell = useCallback(
+    (isHome: boolean, cell: OddsCellActivation) => ({
+      onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+        if (!e.isPrimary) return;
+        e.stopPropagation();
       },
-    }));
-  };
+      onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
+        if (!e.isPrimary) return;
+        e.preventDefault();
+        e.stopPropagation();
+        lastPointerActivationRef.current = Date.now();
+        activateOddsCell(isHome, cell);
+      },
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (Date.now() - lastPointerActivationRef.current < 400) {
+          e.preventDefault();
+          return;
+        }
+        activateOddsCell(isHome, cell);
+      },
+    }),
+    [activateOddsCell]
+  );
 
   const sideRowBoxClass = () =>
     'rounded-lg p-1 md:p-1.5 transition-colors touch-manipulation';
 
   const handleRowClick = () => {
     if (bestPercent) {
+      pickRef.current = emptyGameSidePick();
       onPickChange(() => emptyGameSidePick());
       onOddsClick({
         teamA: game.awayTeam,
@@ -196,7 +229,7 @@ export function useOddsGameInteraction(
     marketOdds,
     bestLines,
     pick,
-    handleSideInteraction,
+    bindOddsCell,
     sideRowBoxClass,
     handleRowClick,
     formatGameTime,

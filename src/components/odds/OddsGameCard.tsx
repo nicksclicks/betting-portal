@@ -33,7 +33,7 @@ export function OddsGameCard({
     marketOdds,
     bestLines,
     pick: gamePick,
-    handleSideInteraction,
+    bindOddsCell,
     handleRowClick,
     formatGameTime,
   } = useOddsGameInteraction(game, marketType, selectedBooks, bestPercent, pick, onPickChange, onOddsClick);
@@ -66,8 +66,8 @@ export function OddsGameCard({
                 {odds !== undefined ? (
                   <button
                     type="button"
-                    onClick={() => handleSideInteraction(isHome, { team, odds, book })}
-                    className={`min-h-[44px] text-sm font-mono font-medium touch-manipulation ${getOddsCellHighlightClass(odds, isBest, sidePick, book)}`}
+                    {...bindOddsCell(isHome, { team, odds, book })}
+                    className={`min-h-[44px] text-sm font-mono font-medium ${getOddsCellHighlightClass(odds, isBest, sidePick, book)}`}
                   >
                     {formatOdds(odds)}
                   </button>

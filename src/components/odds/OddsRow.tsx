@@ -36,7 +36,7 @@ export function OddsRow({
     marketOdds,
     bestLines,
     pick: gamePick,
-    handleSideInteraction,
+    bindOddsCell,
     handleRowClick,
     formatGameTime,
   } = useOddsGameInteraction(game, marketType, selectedBooks, bestPercent, pick, onPickChange, onOddsClick);
@@ -56,8 +56,8 @@ export function OddsRow({
         {odds !== undefined ? (
           <button
             type="button"
-            onClick={() => handleSideInteraction(isHome, { team, odds, book })}
-            className={`w-full min-w-[52px] text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 touch-manipulation ${getOddsCellHighlightClass(odds, isBest, sidePick, book)}`}
+            {...bindOddsCell(isHome, { team, odds, book })}
+            className={`w-full min-w-[52px] text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 ${getOddsCellHighlightClass(odds, isBest, sidePick, book)}`}
           >
             {formatOdds(odds)}
           </button>
@@ -86,14 +86,8 @@ export function OddsRow({
           ) : (
             <button
               type="button"
-              onClick={() =>
-                handleSideInteraction(isHome, {
-                  team,
-                  odds: line.odds,
-                  book: line.book,
-                })
-              }
-              className={`w-full min-h-[44px] text-xs md:text-sm font-mono font-medium touch-manipulation ${getOddsCellHighlightClass(line.odds, true, sidePick, line.book)}`}
+              {...bindOddsCell(isHome, { team, odds: line.odds, book: line.book })}
+              className={`w-full min-h-[44px] text-xs md:text-sm font-mono font-medium ${getOddsCellHighlightClass(line.odds, true, sidePick, line.book)}`}
             >
               {formatOdds(line.odds)}
             </button>
