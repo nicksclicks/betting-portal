@@ -303,7 +303,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             {filtersDirty && (
               <p className="text-lime-400/80">Filters changed — Refresh will pull fresh odds from the API</p>
             )}
-            <p>Pick one odds per row, then tap a row again to open Arbitrage</p>
+            <p>Tap an odd to highlight it; tap again to open Arbitrage. Unselected rows use the green best line.</p>
           </div>
         </div>
 

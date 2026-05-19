@@ -5,6 +5,7 @@ import { BestPercentResult, getBestPercentColorClass } from '../../utils/bestPer
 import {
   GameSidePick,
   getMarketSpreadLabel,
+  getOddsCellHighlightClass,
   OddsClickPayload,
   useOddsGameInteraction,
 } from './useOddsGameInteraction';
@@ -34,10 +35,8 @@ export function OddsRow({
   const {
     marketOdds,
     bestLines,
-    selectedAwayBook,
-    selectedHomeBook,
+    pick: gamePick,
     handleSideInteraction,
-    sideRowBoxClass,
     handleRowClick,
     formatGameTime,
   } = useOddsGameInteraction(game, marketType, selectedBooks, bestPercent, pick, onPickChange, onOddsClick);
@@ -49,7 +48,7 @@ export function OddsRow({
   const renderBookCell = (isHome: boolean, book: Sportsbook) => {
     const odds = isHome ? marketOdds.home[book] : marketOdds.away[book];
     const isBest = isHome ? bestLines?.home?.book === book : bestLines?.away?.book === book;
-    const isSelected = isHome ? selectedHomeBook === book : selectedAwayBook === book;
+    const sidePick = isHome ? gamePick.home : gamePick.away;
     const team = isHome ? game.homeTeam : game.awayTeam;
 
     return (
@@ -57,15 +56,8 @@ export function OddsRow({
         {odds !== undefined ? (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSideInteraction(isHome, { team, odds, book });
-            }}
-            className={`odds-cell w-full min-w-[52px] text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 ${
-              odds > 0 ? 'odds-positive' : 'odds-negative'
-            } ${isBest ? 'odds-cell-best' : ''} ${
-              isSelected && !isBest ? 'bg-neutral-700/40 ring-1 ring-neutral-500/50' : ''
-            }`}
+            onClick={() => handleSideInteraction(isHome, { team, odds, book })}
+            className={`w-full min-w-[52px] text-xs md:text-sm px-1 md:px-3 py-1.5 md:py-2 pointer-coarse:min-h-[44px] pointer-coarse:py-2 pointer-coarse:md:py-2.5 touch-manipulation ${getOddsCellHighlightClass(odds, isBest, sidePick, book)}`}
           >
             {formatOdds(odds)}
           </button>
@@ -80,13 +72,32 @@ export function OddsRow({
 
   const renderBestCell = (isHome: boolean) => {
     const line = isHome ? bestLines?.home : bestLines?.away;
+    const sidePick = isHome ? gamePick.home : gamePick.away;
+    const team = isHome ? game.homeTeam : game.awayTeam;
+    const isInBookColumns = line ? selectedBooks.includes(line.book) : false;
 
     return (
       <td className={`${bookCellClass} min-w-[52px]`}>
         {line ? (
-          <span className="inline-flex w-full min-h-[44px] items-center justify-center text-xs md:text-sm font-mono font-medium text-lime-400">
-            {formatOdds(line.odds)}
-          </span>
+          isInBookColumns ? (
+            <span className="inline-flex w-full min-h-[44px] items-center justify-center text-xs md:text-sm font-mono font-medium text-lime-400">
+              {formatOdds(line.odds)}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() =>
+                handleSideInteraction(isHome, {
+                  team,
+                  odds: line.odds,
+                  book: line.book,
+                })
+              }
+              className={`w-full min-h-[44px] text-xs md:text-sm font-mono font-medium touch-manipulation ${getOddsCellHighlightClass(line.odds, true, sidePick, line.book)}`}
+            >
+              {formatOdds(line.odds)}
+            </button>
+          )
         ) : (
           <span className="inline-flex w-full min-h-[44px] items-center justify-center text-neutral-700 text-xs md:text-sm">
             -
@@ -101,18 +112,7 @@ export function OddsRow({
       <tr className="border-b border-neutral-800/50">
         <td className="pt-2 md:pt-3 pb-0 pl-5 pr-2 md:px-4 sticky left-0 z-10 bg-neutral-950 border-r border-neutral-800 shadow-[6px_0_12px_-4px_rgba(0,0,0,0.65)] align-top min-w-[13rem] max-w-[15rem] sm:min-w-[14rem] sm:max-w-[17rem] md:min-w-[16rem] md:max-w-[22rem] lg:max-w-[26rem]">
           <div className="text-[10px] md:text-xs text-neutral-500 mb-2 md:mb-2.5">{game.sport}</div>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => handleSideInteraction(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleSideInteraction(false);
-              }
-            }}
-            className={`text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0 ${sideRowBoxClass()}`}
-          >
+          <div className="text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0">
             <span className="text-neutral-500 text-[10px] md:text-xs shrink-0">A</span>
             <span className="text-neutral-700 shrink-0">|</span>
             <span className="truncate min-w-0 flex-1">{game.awayTeam}</span>
@@ -147,18 +147,7 @@ export function OddsRow({
       </tr>
       <tr className="border-b border-neutral-800">
         <td className="pt-1.5 md:pt-2 pb-2 pl-5 pr-2 md:px-4 sticky left-0 z-10 bg-neutral-950 border-r border-neutral-800 shadow-[6px_0_12px_-4px_rgba(0,0,0,0.65)] align-top min-w-[13rem] max-w-[15rem] sm:min-w-[14rem] sm:max-w-[17rem] md:min-w-[16rem] md:max-w-[22rem] lg:max-w-[26rem]">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => handleSideInteraction(true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleSideInteraction(true);
-              }
-            }}
-            className={`text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0 ${sideRowBoxClass()}`}
-          >
+          <div className="text-xs md:text-sm font-medium text-white flex items-center gap-1 md:gap-2 min-w-0">
             <span className="text-neutral-500 text-[10px] md:text-xs shrink-0">H</span>
             <span className="text-neutral-700 shrink-0">|</span>
             <span className="truncate min-w-0 flex-1">{game.homeTeam}</span>

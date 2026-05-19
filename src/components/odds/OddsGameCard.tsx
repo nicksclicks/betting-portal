@@ -5,6 +5,7 @@ import { BestPercentResult, getBestPercentColorClass } from '../../utils/bestPer
 import {
   GameSidePick,
   getMarketSpreadLabel,
+  getOddsCellHighlightClass,
   OddsClickPayload,
   useOddsGameInteraction,
 } from './useOddsGameInteraction';
@@ -31,10 +32,8 @@ export function OddsGameCard({
   const {
     marketOdds,
     bestLines,
-    selectedAwayBook,
-    selectedHomeBook,
+    pick: gamePick,
     handleSideInteraction,
-    sideRowBoxClass,
     handleRowClick,
     formatGameTime,
   } = useOddsGameInteraction(game, marketType, selectedBooks, bestPercent, pick, onPickChange, onOddsClick);
@@ -43,35 +42,13 @@ export function OddsGameCard({
 
   const spreadLabel = getMarketSpreadLabel(marketType, marketOdds);
 
-  const oddsBtnClass = (
-    odds: number,
-    isBest: boolean,
-    isSelected: boolean
-  ) =>
-    [
-      'odds-cell min-h-[44px] text-sm font-mono font-medium',
-      odds > 0 ? 'text-lime-400' : 'text-amber-400',
-      isBest ? 'odds-cell-best' : '',
-      isSelected && !isBest ? 'bg-neutral-700/40 ring-1 ring-neutral-500/50 hover:bg-neutral-700/50' : '',
-    ].join(' ');
-
   const renderSideRow = (isHome: boolean) => {
     const team = isHome ? game.homeTeam : game.awayTeam;
     const sideLabel = isHome ? 'H' : 'A';
+    const sidePick = isHome ? gamePick.home : gamePick.away;
 
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => handleSideInteraction(isHome)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleSideInteraction(isHome);
-          }
-        }}
-        className={sideRowBoxClass()}
-      >
+      <div className="rounded-lg p-1 md:p-1.5">
         <p className="text-sm text-white font-medium mb-2">
           <span className="text-neutral-500 text-xs mr-1.5">{sideLabel}</span>
           {team}
@@ -80,7 +57,6 @@ export function OddsGameCard({
           {selectedBooks.map((book) => {
             const odds = isHome ? marketOdds.home[book] : marketOdds.away[book];
             const isBest = isHome ? bestLines?.home?.book === book : bestLines?.away?.book === book;
-            const isSelected = isHome ? selectedHomeBook === book : selectedAwayBook === book;
 
             return (
               <div key={book} className="flex flex-col gap-1 min-w-0">
@@ -90,11 +66,8 @@ export function OddsGameCard({
                 {odds !== undefined ? (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSideInteraction(isHome, { team, odds, book });
-                    }}
-                    className={oddsBtnClass(odds, isBest, isSelected)}
+                    onClick={() => handleSideInteraction(isHome, { team, odds, book })}
+                    className={`min-h-[44px] text-sm font-mono font-medium touch-manipulation ${getOddsCellHighlightClass(odds, isBest, sidePick, book)}`}
                   >
                     {formatOdds(odds)}
                   </button>
