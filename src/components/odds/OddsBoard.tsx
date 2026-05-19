@@ -13,6 +13,7 @@ import { isLocalMockMode, supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
 import { calculateGameBestPercent } from '../../utils/bestPercent';
+import { emptyGameSidePick, type GameSidePick } from './useOddsGameInteraction';
 
 interface OddsBoardProps {
   onOddsClick: (data: {
@@ -78,6 +79,22 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [loading, setLoading] = useState(true);
   const [lastLiveSync, setLastLiveSync] = useState<Date | null>(() => readLastOddsEdgeSync());
   const [sortByBestPercent, setSortByBestPercent] = useState(false);
+  const [gamePicks, setGamePicks] = useState<Record<string, GameSidePick>>({});
+
+  const getGamePick = useCallback(
+    (gameId: string) => gamePicks[gameId] ?? emptyGameSidePick(),
+    [gamePicks]
+  );
+
+  const setGamePick = useCallback(
+    (gameId: string, update: (prev: GameSidePick) => GameSidePick) => {
+      setGamePicks((prev) => ({
+        ...prev,
+        [gameId]: update(prev[gameId] ?? emptyGameSidePick()),
+      }));
+    },
+    []
+  );
 
   const performOddsLoad = useCallback(async (signal?: AbortSignal) => {
     const gone = () => signal?.aborted ?? false;
@@ -242,7 +259,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             <p>
               {lastLiveSync ? `Last live sync: ${lastLiveSync.toLocaleString()}` : 'Last live sync: —'}
             </p>
-            <p>Tap odds to fill calculator</p>
+            <p>Pick one odds per row, then tap a row again to open Arbitrage</p>
           </div>
         </div>
 
@@ -408,6 +425,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                     selectedBooks={selectedBooks}
                     bestPercent={bestPercent}
                     onOddsClick={onOddsClick}
+                    pick={getGamePick(game.id)}
+                    onPickChange={(pick) => setGamePick(game.id, pick)}
                   />
                 ))}
               </div>
@@ -467,6 +486,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                         selectedBooks={selectedBooks}
                         bestPercent={bestPercent}
                         onOddsClick={onOddsClick}
+                        pick={getGamePick(game.id)}
+                        onPickChange={(pick) => setGamePick(game.id, pick)}
                       />
                     ))}
                   </tbody>

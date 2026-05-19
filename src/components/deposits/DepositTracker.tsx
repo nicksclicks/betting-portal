@@ -6,22 +6,41 @@ import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { formatCurrency } from '../../utils/odds';
 import { DEPOSIT_STATUSES, DepositStatus } from '../../constants/sportsbooks';
 import { DepositMobileCard } from './DepositMobileCard';
+import {
+  parseNonNegativeMoneyInput,
+  parsePositiveDecimalInput,
+  parsePositiveMoneyInput,
+} from '../../utils/formNumbers';
+
+interface DepositFormData {
+  sportsbook: string;
+  deposit_amount: string;
+  deposit_date: string;
+  bonus_received: string;
+  rollover_multiplier: string;
+  current_balance: string;
+  status: DepositStatus;
+  notes: string;
+}
+
+const createEmptyForm = (): DepositFormData => ({
+  sportsbook: '',
+  deposit_amount: '',
+  deposit_date: new Date().toISOString().split('T')[0],
+  bonus_received: '',
+  rollover_multiplier: '1',
+  current_balance: '',
+  status: 'active',
+  notes: '',
+});
 
 export function DepositTracker() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<DepositInsert>>({
-    sportsbook: '',
-    deposit_amount: 0,
-    deposit_date: new Date().toISOString().split('T')[0],
-    bonus_received: 0,
-    rollover_multiplier: 1,
-    current_balance: 0,
-    status: 'active',
-    notes: '',
-  });
+  const [formData, setFormData] = useState<DepositFormData>(createEmptyForm);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDeposits();
@@ -45,29 +64,72 @@ export function DepositTracker() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.sportsbook || !formData.deposit_amount) {
+    if (!formData.sportsbook) {
+      setSubmitError('Select a sportsbook.');
       return;
     }
+
+    if (!formData.deposit_date) {
+      setSubmitError('Enter a deposit date.');
+      return;
+    }
+
+    const depositAmount = parsePositiveMoneyInput(formData.deposit_amount);
+    if (depositAmount === null) {
+      setSubmitError('Deposit amount must be a positive number.');
+      return;
+    }
+
+    const bonusReceived = parseNonNegativeMoneyInput(formData.bonus_received);
+    if (bonusReceived === null) {
+      setSubmitError('Bonus received must be a valid number.');
+      return;
+    }
+
+    const rolloverMultiplier = parsePositiveDecimalInput(formData.rollover_multiplier);
+    if (rolloverMultiplier === null) {
+      setSubmitError('Rollover multiplier must be a positive number.');
+      return;
+    }
+
+    const currentBalance = parseNonNegativeMoneyInput(formData.current_balance);
+    if (currentBalance === null) {
+      setSubmitError('Current balance must be a valid number.');
+      return;
+    }
+
+    const payload: DepositInsert = {
+      sportsbook: formData.sportsbook,
+      deposit_amount: depositAmount,
+      deposit_date: formData.deposit_date,
+      bonus_received: bonusReceived,
+      rollover_multiplier: rolloverMultiplier,
+      current_balance: currentBalance,
+      status: formData.status,
+      notes: formData.notes || null,
+    };
+
+    setSubmitError(null);
 
     if (editingId) {
       const { error } = await supabase
         .from('deposits')
         .update({
-          ...formData,
+          ...payload,
           updated_at: new Date().toISOString(),
         } as DepositUpdate)
         .eq('id', editingId);
 
       if (error) {
-        console.error('Error updating deposit:', error);
+        setSubmitError('Could not save deposit. Check your inputs and try again.');
+        return;
       }
     } else {
-      const { error } = await supabase
-        .from('deposits')
-        .insert([formData as DepositInsert]);
+      const { error } = await supabase.from('deposits').insert([payload]);
 
       if (error) {
-        console.error('Error creating deposit:', error);
+        setSubmitError('Could not save deposit. Check your inputs and try again.');
+        return;
       }
     }
 
@@ -76,13 +138,14 @@ export function DepositTracker() {
   };
 
   const handleEdit = (deposit: Deposit) => {
+    setSubmitError(null);
     setFormData({
       sportsbook: deposit.sportsbook,
-      deposit_amount: deposit.deposit_amount,
+      deposit_amount: deposit.deposit_amount.toString(),
       deposit_date: deposit.deposit_date,
-      bonus_received: deposit.bonus_received,
-      rollover_multiplier: deposit.rollover_multiplier,
-      current_balance: deposit.current_balance,
+      bonus_received: deposit.bonus_received.toString(),
+      rollover_multiplier: deposit.rollover_multiplier.toString(),
+      current_balance: deposit.current_balance.toString(),
       status: deposit.status,
       notes: deposit.notes || '',
     });
@@ -105,18 +168,15 @@ export function DepositTracker() {
   };
 
   const resetForm = () => {
-    setFormData({
-      sportsbook: '',
-      deposit_amount: 0,
-      deposit_date: new Date().toISOString().split('T')[0],
-      bonus_received: 0,
-      rollover_multiplier: 1,
-      current_balance: 0,
-      status: 'active',
-      notes: '',
-    });
+    setFormData(createEmptyForm());
+    setSubmitError(null);
     setEditingId(null);
     setShowForm(false);
+  };
+
+  const updateFormField = <K extends keyof DepositFormData>(field: K, value: DepositFormData[K]) => {
+    setSubmitError(null);
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const exportToCSV = () => {
@@ -242,7 +302,12 @@ export function DepositTracker() {
               <span className="hidden sm:inline">Export</span> CSV
             </button>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setSubmitError(null);
+                setFormData(createEmptyForm());
+                setEditingId(null);
+                setShowForm(true);
+              }}
               className="btn-primary text-xs md:text-sm flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -266,25 +331,20 @@ export function DepositTracker() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <SportsbookSelect
                   label="Sportsbook"
-                  value={formData.sportsbook || ''}
-                  onChange={(v) => setFormData((prev) => ({ ...prev, sportsbook: v }))}
+                  value={formData.sportsbook}
+                  onChange={(v) => updateFormField('sportsbook', v)}
                   id="deposit-sportsbook"
                 />
 
                 <div>
                   <label className="label">Deposit Amount</label>
                   <input
-                    type="number"
-                    value={formData.deposit_amount || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        deposit_amount: parseFloat(e.target.value) || 0,
-                      }))
-                    }
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.deposit_amount}
+                    onChange={(e) => updateFormField('deposit_amount', e.target.value)}
                     className="input-field font-mono"
                     placeholder="100"
-                    required
                   />
                 </div>
 
@@ -292,26 +352,19 @@ export function DepositTracker() {
                   <label className="label">Deposit Date</label>
                   <input
                     type="date"
-                    value={formData.deposit_date || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, deposit_date: e.target.value }))
-                    }
+                    value={formData.deposit_date}
+                    onChange={(e) => updateFormField('deposit_date', e.target.value)}
                     className="input-field"
-                    required
                   />
                 </div>
 
                 <div>
                   <label className="label">Bonus Received</label>
                   <input
-                    type="number"
-                    value={formData.bonus_received || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        bonus_received: parseFloat(e.target.value) || 0,
-                      }))
-                    }
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.bonus_received}
+                    onChange={(e) => updateFormField('bonus_received', e.target.value)}
                     className="input-field font-mono"
                     placeholder="0"
                   />
@@ -320,31 +373,22 @@ export function DepositTracker() {
                 <div>
                   <label className="label">Rollover Multiplier</label>
                   <input
-                    type="number"
-                    value={formData.rollover_multiplier || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        rollover_multiplier: parseFloat(e.target.value) || 1,
-                      }))
-                    }
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.rollover_multiplier}
+                    onChange={(e) => updateFormField('rollover_multiplier', e.target.value)}
                     className="input-field font-mono"
                     placeholder="10"
-                    step="0.5"
                   />
                 </div>
 
                 <div>
                   <label className="label">Current Balance</label>
                   <input
-                    type="number"
-                    value={formData.current_balance || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        current_balance: parseFloat(e.target.value) || 0,
-                      }))
-                    }
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.current_balance}
+                    onChange={(e) => updateFormField('current_balance', e.target.value)}
                     className="input-field font-mono"
                     placeholder="0"
                   />
@@ -353,13 +397,8 @@ export function DepositTracker() {
                 <div>
                   <label className="label">Status</label>
                   <select
-                    value={formData.status || 'active'}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        status: e.target.value as DepositStatus,
-                      }))
-                    }
+                    value={formData.status}
+                    onChange={(e) => updateFormField('status', e.target.value as DepositStatus)}
                     className="select-field"
                   >
                     {DEPOSIT_STATUSES.map((status) => (
@@ -374,15 +413,19 @@ export function DepositTracker() {
                   <label className="label">Notes (Optional)</label>
                   <input
                     type="text"
-                    value={formData.notes || ''}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, notes: e.target.value }))
-                    }
+                    value={formData.notes}
+                    onChange={(e) => updateFormField('notes', e.target.value)}
                     className="input-field"
                     placeholder="Any additional notes..."
                   />
                 </div>
               </div>
+
+              {submitError && (
+                <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                  {submitError}
+                </p>
+              )}
 
               <div className="flex gap-2">
                 <button type="submit" className="btn-primary">

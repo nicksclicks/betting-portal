@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { GameOdds } from '../../data/mockOdds';
 import { MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { BestPercentResult } from '../../utils/bestPercent';
@@ -12,10 +12,23 @@ export type OddsClickPayload = {
   bookB: Sportsbook;
 };
 
-interface SelectedCell {
+export type SidePick = {
   book: Sportsbook;
-  isHome: boolean;
+  odds: number;
+  team: string;
+};
+
+export type GameSidePick = {
+  away: SidePick | null;
+  home: SidePick | null;
+  armedRow: 'away' | 'home' | null;
+};
+
+export function emptyGameSidePick(): GameSidePick {
+  return { away: null, home: null, armedRow: null };
 }
+
+type SideRow = 'away' | 'home';
 
 export function getMarketSpreadLabel(
   marketType: MarketType,
@@ -35,10 +48,11 @@ export function useOddsGameInteraction(
   marketType: MarketType,
   selectedBooks: Sportsbook[],
   bestPercent: BestPercentResult | null,
+  pick: GameSidePick,
+  onPickChange: (update: (prev: GameSidePick) => GameSidePick) => void,
   onOddsClick: (data: OddsClickPayload) => void
 ) {
   const marketOdds = game.odds[marketType];
-  const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
 
   const bestLines = useMemo(() => {
     if (!marketOdds) return null;
@@ -64,43 +78,170 @@ export function useOddsGameInteraction(
     };
   }, [marketOdds, selectedBooks]);
 
-  const handleOddsClick = (
-    team: string,
-    odds: number,
-    book: Sportsbook,
-    isHome: boolean
-  ) => {
+  type NavigateTrigger = {
+    isHome: boolean;
+    team: string;
+    odds: number;
+    book: Sportsbook;
+  };
+
+  const resolveNavigatePayload = (trigger?: NavigateTrigger): OddsClickPayload | null => {
+    if (!bestLines) return null;
+
+    const { away: awayPick, home: homePick } = pick;
+
+    if (awayPick && homePick) {
+      return {
+        teamA: awayPick.team,
+        teamB: homePick.team,
+        oddsA: awayPick.odds,
+        oddsB: homePick.odds,
+        bookA: awayPick.book,
+        bookB: homePick.book,
+      };
+    }
+
+    const awayFromBest = bestLines.away
+      ? { team: game.awayTeam, odds: bestLines.away.odds, book: bestLines.away.book }
+      : null;
+    const homeFromBest = bestLines.home
+      ? { team: game.homeTeam, odds: bestLines.home.odds, book: bestLines.home.book }
+      : null;
+
+    if (trigger) {
+      if (trigger.isHome) {
+        const homeSide = homePick ?? {
+          team: trigger.team,
+          odds: trigger.odds,
+          book: trigger.book,
+        };
+        const awaySide = awayPick ?? awayFromBest;
+        if (!awaySide) return null;
+        return {
+          teamA: awaySide.team,
+          teamB: homeSide.team,
+          oddsA: awaySide.odds,
+          oddsB: homeSide.odds,
+          bookA: awaySide.book,
+          bookB: homeSide.book,
+        };
+      }
+
+      const awaySide = awayPick ?? {
+        team: trigger.team,
+        odds: trigger.odds,
+        book: trigger.book,
+      };
+      const homeSide = homePick ?? homeFromBest;
+      if (!homeSide) return null;
+      return {
+        teamA: awaySide.team,
+        teamB: homeSide.team,
+        oddsA: awaySide.odds,
+        oddsB: homeSide.odds,
+        bookA: awaySide.book,
+        bookB: homeSide.book,
+      };
+    }
+
+    return null;
+  };
+
+  const navigateToArbitrage = (trigger?: NavigateTrigger) => {
+    const payload = resolveNavigatePayload(trigger);
+    if (!payload) return;
+
+    onPickChange(() => emptyGameSidePick());
+    onOddsClick(payload);
+  };
+
+  const navigateFromSide = (isHome: boolean) => {
     if (!bestLines) return;
 
-    const isBestLine = isHome
-      ? bestLines.home?.book === book
-      : bestLines.away?.book === book;
+    if (pick.away && pick.home) {
+      navigateToArbitrage();
+      return;
+    }
 
-    const isCurrentlySelected =
-      selectedCell?.book === book && selectedCell?.isHome === isHome;
+    const sidePick = isHome ? pick.home : pick.away;
+    if (sidePick) {
+      navigateToArbitrage({
+        isHome,
+        team: sidePick.team,
+        odds: sidePick.odds,
+        book: sidePick.book,
+      });
+      return;
+    }
 
-    if (isBestLine || isCurrentlySelected) {
-      const oppositeOdds = isHome ? bestLines.away?.odds : bestLines.home?.odds;
-      const oppositeBook = isHome ? bestLines.away?.book : bestLines.home?.book;
-
-      if (oppositeOdds !== undefined && oppositeBook) {
-        setSelectedCell(null);
-        onOddsClick({
-          teamA: team,
-          teamB: isHome ? game.awayTeam : game.homeTeam,
-          oddsA: odds,
-          oddsB: oppositeOdds,
-          bookA: book,
-          bookB: oppositeBook,
-        });
-      }
-    } else {
-      setSelectedCell({ book, isHome });
+    const best = isHome ? bestLines.home : bestLines.away;
+    if (best) {
+      navigateToArbitrage({
+        isHome,
+        team: isHome ? game.homeTeam : game.awayTeam,
+        odds: best.odds,
+        book: best.book,
+      });
     }
   };
 
+  const handleSideInteraction = (
+    isHome: boolean,
+    cell?: { team: string; odds: number; book: Sportsbook }
+  ) => {
+    if (!bestLines) return;
+
+    const side: SideRow = isHome ? 'home' : 'away';
+    const sideKey = isHome ? 'home' : 'away';
+
+    if (cell) {
+      const isBestLine = isHome
+        ? bestLines.home?.book === cell.book
+        : bestLines.away?.book === cell.book;
+
+      if (isBestLine) {
+        navigateToArbitrage({ isHome, team: cell.team, odds: cell.odds, book: cell.book });
+        return;
+      }
+
+      if (pick.armedRow === side) {
+        const currentPick = pick[sideKey];
+        const isSameCell = currentPick?.book === cell.book;
+
+        if (isSameCell) {
+          navigateToArbitrage({ isHome, team: cell.team, odds: cell.odds, book: cell.book });
+          return;
+        }
+
+        onPickChange((prev) => ({
+          ...prev,
+          [sideKey]: { book: cell.book, odds: cell.odds, team: cell.team },
+        }));
+        return;
+      }
+
+      onPickChange((prev) => ({
+        ...prev,
+        [sideKey]: { book: cell.book, odds: cell.odds, team: cell.team },
+        armedRow: side,
+      }));
+      return;
+    }
+
+    if (pick.armedRow === side) {
+      navigateFromSide(isHome);
+      return;
+    }
+
+    onPickChange((prev) => ({ ...prev, armedRow: side }));
+  };
+
+  const sideRowBoxClass = () =>
+    'rounded-lg p-1 md:p-1.5 transition-colors touch-manipulation cursor-pointer';
+
   const handleRowClick = () => {
     if (bestPercent) {
+      onPickChange(() => emptyGameSidePick());
       onOddsClick({
         teamA: game.awayTeam,
         teamB: game.homeTeam,
@@ -123,11 +264,16 @@ export function useOddsGameInteraction(
     }).format(date);
   };
 
+  const selectedAwayBook = pick.away?.book ?? null;
+  const selectedHomeBook = pick.home?.book ?? null;
+
   return {
     marketOdds,
     bestLines,
-    selectedCell,
-    handleOddsClick,
+    selectedAwayBook,
+    selectedHomeBook,
+    handleSideInteraction,
+    sideRowBoxClass,
     handleRowClick,
     formatGameTime,
   };

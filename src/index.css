@@ -76,6 +76,11 @@
            hover:bg-neutral-800 active:bg-neutral-800 text-sm font-medium;
   }
 
+  .odds-cell.odds-cell-best {
+    @apply bg-lime-500/10 ring-1 ring-lime-500/30
+           hover:bg-lime-500/20 active:bg-lime-500/25;
+  }
+
   .odds-positive {
     @apply text-lime-400;
   }

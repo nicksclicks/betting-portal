@@ -3,6 +3,7 @@ import { GameOdds } from '../../data/mockOdds';
 import { formatOdds, formatPercent } from '../../utils/odds';
 import { BestPercentResult, getBestPercentColorClass } from '../../utils/bestPercent';
 import {
+  GameSidePick,
   getMarketSpreadLabel,
   OddsClickPayload,
   useOddsGameInteraction,
@@ -14,6 +15,8 @@ interface OddsGameCardProps {
   selectedBooks: Sportsbook[];
   bestPercent: BestPercentResult | null;
   onOddsClick: (data: OddsClickPayload) => void;
+  pick: GameSidePick;
+  onPickChange: (update: (prev: GameSidePick) => GameSidePick) => void;
 }
 
 export function OddsGameCard({
@@ -22,15 +25,19 @@ export function OddsGameCard({
   selectedBooks,
   bestPercent,
   onOddsClick,
+  pick,
+  onPickChange,
 }: OddsGameCardProps) {
   const {
     marketOdds,
     bestLines,
-    selectedCell,
-    handleOddsClick,
+    selectedAwayBook,
+    selectedHomeBook,
+    handleSideInteraction,
+    sideRowBoxClass,
     handleRowClick,
     formatGameTime,
-  } = useOddsGameInteraction(game, marketType, selectedBooks, bestPercent, onOddsClick);
+  } = useOddsGameInteraction(game, marketType, selectedBooks, bestPercent, pick, onPickChange, onOddsClick);
 
   if (!marketOdds) return null;
 
@@ -42,12 +49,75 @@ export function OddsGameCard({
     isSelected: boolean
   ) =>
     [
-      'min-h-[44px] flex-1 rounded-lg text-sm font-mono font-medium transition-colors touch-manipulation',
+      'odds-cell min-h-[44px] text-sm font-mono font-medium',
       odds > 0 ? 'text-lime-400' : 'text-amber-400',
-      isBest ? 'bg-lime-500/10 ring-1 ring-lime-500/30' : 'bg-neutral-900/80',
-      isSelected && !isBest ? 'bg-neutral-700/40 ring-1 ring-neutral-500/50' : '',
-      !isBest && !isSelected ? 'active:bg-neutral-800' : '',
+      isBest ? 'odds-cell-best' : '',
+      isSelected && !isBest ? 'bg-neutral-700/40 ring-1 ring-neutral-500/50 hover:bg-neutral-700/50' : '',
     ].join(' ');
+
+  const renderSideRow = (isHome: boolean) => {
+    const team = isHome ? game.homeTeam : game.awayTeam;
+    const sideLabel = isHome ? 'H' : 'A';
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => handleSideInteraction(isHome)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleSideInteraction(isHome);
+          }
+        }}
+        className={sideRowBoxClass()}
+      >
+        <p className="text-sm text-white font-medium mb-2">
+          <span className="text-neutral-500 text-xs mr-1.5">{sideLabel}</span>
+          {team}
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {selectedBooks.map((book) => {
+            const odds = isHome ? marketOdds.home[book] : marketOdds.away[book];
+            const isBest = isHome ? bestLines?.home?.book === book : bestLines?.away?.book === book;
+            const isSelected = isHome ? selectedHomeBook === book : selectedAwayBook === book;
+
+            return (
+              <div key={book} className="flex flex-col gap-1 min-w-0">
+                <span className="text-[10px] text-neutral-500 truncate" title={book}>
+                  {book}
+                </span>
+                {odds !== undefined ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSideInteraction(isHome, { team, odds, book });
+                    }}
+                    className={oddsBtnClass(odds, isBest, isSelected)}
+                  >
+                    {formatOdds(odds)}
+                  </button>
+                ) : (
+                  <span className="min-h-[44px] flex items-center justify-center rounded-lg bg-neutral-900/40 text-neutral-600 text-sm">
+                    —
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {(isHome ? bestLines?.home : bestLines?.away) && (
+          <p className="mt-2 text-xs text-neutral-500">
+            Best{' '}
+            <span className="font-mono text-lime-400 font-medium">
+              {formatOdds((isHome ? bestLines!.home! : bestLines!.away!).odds)}
+            </span>
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <article className="p-4 bg-neutral-950 border-b border-neutral-800 last:border-b-0">
@@ -55,18 +125,8 @@ export function OddsGameCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 mb-1">
             <span className="text-neutral-400 font-medium">{game.sport}</span>
-            {spreadLabel && (
-              <span className="text-neutral-600">{spreadLabel}</span>
-            )}
+            {spreadLabel && <span className="text-neutral-600">{spreadLabel}</span>}
           </div>
-          <p className="text-sm text-white font-medium leading-snug">
-            <span className="text-neutral-500 text-xs mr-1.5">A</span>
-            {game.awayTeam}
-          </p>
-          <p className="text-sm text-white font-medium leading-snug mt-1">
-            <span className="text-neutral-500 text-xs mr-1.5">H</span>
-            {game.homeTeam}
-          </p>
         </div>
         {bestPercent && (
           <button
@@ -79,83 +139,12 @@ export function OddsGameCard({
         )}
       </div>
 
-      <div className="space-y-2">
-        <p className="text-xs text-neutral-500">
-          {formatGameTime(game.gameTime)}
-        </p>
-        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
-          <span className="w-[5.5rem] shrink-0" aria-hidden />
-          <span className="flex-1 text-center">Away</span>
-          <span className="flex-1 text-center">Home</span>
-        </div>
-        {selectedBooks.map((book) => {
-          const awayOdds = marketOdds.away[book];
-          const homeOdds = marketOdds.home[book];
-          const awayBest = bestLines?.away?.book === book;
-          const homeBest = bestLines?.home?.book === book;
-          const awaySel = selectedCell?.book === book && !selectedCell?.isHome;
-          const homeSel = selectedCell?.book === book && selectedCell?.isHome;
+      <p className="text-xs text-neutral-500 mb-3">{formatGameTime(game.gameTime)}</p>
 
-          return (
-            <div
-              key={book}
-              className="flex items-center gap-2 py-1.5 border-t border-neutral-800/60 first:border-t-0 first:pt-0"
-            >
-              <span className="w-[5.5rem] shrink-0 text-xs text-neutral-400 truncate" title={book}>
-                {book}
-              </span>
-              <div className="flex flex-1 gap-2 min-w-0">
-                {awayOdds !== undefined ? (
-                  <button
-                    type="button"
-                    onClick={() => handleOddsClick(game.awayTeam, awayOdds, book, false)}
-                    className={oddsBtnClass(awayOdds, awayBest, awaySel)}
-                  >
-                    {formatOdds(awayOdds)}
-                  </button>
-                ) : (
-                  <span className="min-h-[44px] flex-1 flex items-center justify-center rounded-lg bg-neutral-900/40 text-neutral-600 text-sm">
-                    —
-                  </span>
-                )}
-                {homeOdds !== undefined ? (
-                  <button
-                    type="button"
-                    onClick={() => handleOddsClick(game.homeTeam, homeOdds, book, true)}
-                    className={oddsBtnClass(homeOdds, homeBest, homeSel)}
-                  >
-                    {formatOdds(homeOdds)}
-                  </button>
-                ) : (
-                  <span className="min-h-[44px] flex-1 flex items-center justify-center rounded-lg bg-neutral-900/40 text-neutral-600 text-sm">
-                    —
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="space-y-3">
+        {renderSideRow(false)}
+        {renderSideRow(true)}
       </div>
-
-      {(bestLines?.away || bestLines?.home) && (
-        <div className="mt-3 pt-3 border-t border-neutral-800/80 flex items-center gap-2 text-xs">
-          <span className="w-[5.5rem] shrink-0" aria-hidden />
-          <div className="flex flex-1 gap-2 min-w-0">
-            <div className="flex-1 text-center">
-              <span className="text-neutral-600">Best away </span>
-              <span className="font-mono text-lime-400 font-medium">
-                {bestLines.away ? formatOdds(bestLines.away.odds) : '—'}
-              </span>
-            </div>
-            <div className="flex-1 text-center">
-              <span className="text-neutral-600">Best home </span>
-              <span className="font-mono text-lime-400 font-medium">
-                {bestLines.home ? formatOdds(bestLines.home.odds) : '—'}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </article>
   );
 }

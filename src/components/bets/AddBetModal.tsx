@@ -3,6 +3,7 @@ import { X, Plus, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BetInsert } from '../../types/database';
 import { ALL_SPORTSBOOKS } from '../../constants/sportsbooks';
+import { parseAmericanOddsInput, parsePositiveMoneyInput } from '../../utils/formNumbers';
 
 interface BetEntry {
   id: string;
@@ -34,9 +35,12 @@ const createEmptyBet = (): BetEntry => ({
 export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetModalProps) {
   const [bets, setBets] = useState<BetEntry[]>([createEmptyBet(), createEmptyBet()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && initialBets && initialBets.length > 0) {
+    if (!isOpen) return;
+    setSubmitError(null);
+    if (initialBets && initialBets.length > 0) {
       setBets(
         initialBets.map((b) => ({
           ...createEmptyBet(),
@@ -50,6 +54,7 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
   }, [isOpen, initialBets]);
 
   const updateBet = (id: string, field: keyof BetEntry, value: string | boolean) => {
+    setSubmitError(null);
     setBets((prev) =>
       prev.map((bet) => (bet.id === id ? { ...bet, [field]: value } : bet))
     );
@@ -66,20 +71,43 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
   };
 
   const handleSubmit = async () => {
-    const validBets = bets.filter(
+    const filledBets = bets.filter(
       (bet) => bet.betName && bet.sportsbook && bet.odds && bet.amountStaked
     );
 
-    if (validBets.length === 0) return;
+    if (filledBets.length === 0) {
+      setSubmitError(
+        'Enter bet name, sportsbook, odd price, and amount staked for at least one bet.'
+      );
+      return;
+    }
 
+    const parsedBets: { bet: BetEntry; odds: number; amountStaked: number }[] = [];
+    for (const bet of filledBets) {
+      const odds = parseAmericanOddsInput(bet.odds);
+      if (odds === null) {
+        setSubmitError('Odd price must be a valid number (e.g. +150 or -110).');
+        return;
+      }
+
+      const amountStaked = parsePositiveMoneyInput(bet.amountStaked);
+      if (amountStaked === null) {
+        setSubmitError('Amount staked must be a positive number.');
+        return;
+      }
+
+      parsedBets.push({ bet, odds, amountStaked });
+    }
+
+    setSubmitError(null);
     setIsSubmitting(true);
-    const groupId = validBets.length > 1 ? crypto.randomUUID() : null;
+    const groupId = parsedBets.length > 1 ? crypto.randomUUID() : null;
 
-    const betsToInsert: BetInsert[] = validBets.map((bet) => ({
+    const betsToInsert: BetInsert[] = parsedBets.map(({ bet, odds, amountStaked }) => ({
       bet_name: bet.betName,
       sportsbook: bet.sportsbook,
-      odds: parseInt(bet.odds, 10),
-      amount_staked: parseFloat(bet.amountStaked),
+      odds,
+      amount_staked: amountStaked,
       is_bonus_bet: bet.isBonusBet,
       is_odds_boost: bet.isOddsBoost,
       group_id: groupId,
@@ -89,11 +117,14 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
 
     setIsSubmitting(false);
 
-    if (!error) {
-      onSuccess?.();
-      onClose();
-      setBets([createEmptyBet(), createEmptyBet()]);
+    if (error) {
+      setSubmitError('Could not save bet. Check your inputs and try again.');
+      return;
     }
+
+    onSuccess?.();
+    onClose();
+    setBets([createEmptyBet(), createEmptyBet()]);
   };
 
   if (!isOpen) return null;
@@ -232,7 +263,12 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
           </button>
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-neutral-800 shrink-0 safe-area-bottom">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 p-4 sm:p-6 border-t border-neutral-800 shrink-0 safe-area-bottom">
+          {submitError && (
+            <p className="w-full sm:flex-1 sm:mr-auto text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {submitError}
+            </p>
+          )}
           <button
             type="button"
             onClick={onClose}
