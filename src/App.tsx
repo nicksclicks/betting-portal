@@ -40,7 +40,7 @@ function ProfileMissingScreen() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow">
       <div className="card max-w-md w-full text-center space-y-4">
         <h1 className="text-xl font-semibold text-white">Finish setting up your account</h1>
         <p className="text-neutral-400 text-sm">
@@ -140,7 +140,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-black">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-lgm-glow">
         <Loader2 className="w-10 h-10 animate-spin text-neutral-500" aria-label="Loading" />
       </div>
     );

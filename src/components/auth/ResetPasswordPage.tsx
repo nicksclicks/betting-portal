@@ -67,7 +67,7 @@ export function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps) {
 
   if (isLocalMock) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow">
         <div className="card max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-white mb-2">Local mock mode</h1>
           <p className="text-neutral-400 text-sm">Password reset is not available in mock mode.</p>
@@ -78,7 +78,7 @@ export function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps) {
 
   if (phase === 'checking') {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow">
         <Loader2 className="w-10 h-10 animate-spin text-neutral-500" aria-label="Loading" />
         <p className="text-neutral-500 text-sm mt-4">Verifying reset link…</p>
       </div>
@@ -87,7 +87,7 @@ export function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps) {
 
   if (phase === 'invalid') {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black py-12">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow py-12">
         <div className="card max-w-md w-full text-center space-y-4">
           <h1 className="text-xl font-semibold text-white">Link invalid or expired</h1>
           <p className="text-neutral-400 text-sm">Request a new reset link from the sign-in page.</p>
@@ -100,7 +100,7 @@ export function ResetPasswordPage({ onNavigate }: ResetPasswordPageProps) {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black py-12">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white tracking-tight">Choose a new password</h1>

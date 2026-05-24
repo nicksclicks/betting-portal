@@ -30,7 +30,7 @@ export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
 
   if (isLocalMock) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow">
         <div className="card max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-white mb-2">Local mock mode</h1>
           <p className="text-neutral-400 text-sm">Password reset is not available in mock mode.</p>
@@ -40,7 +40,7 @@ export function ForgotPasswordPage({ onNavigate }: ForgotPasswordPageProps) {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black py-12">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white tracking-tight">Reset password</h1>

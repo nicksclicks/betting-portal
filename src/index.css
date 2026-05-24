@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer utilities {
+  .bg-lgm-glow {
+    background-color: #000000;
+    background-image:
+      radial-gradient(ellipse 85% 55% at 0% 0%, rgba(74, 55, 40, 0.55) 0%, transparent 55%),
+      radial-gradient(ellipse 75% 50% at 100% 0%, rgba(38, 36, 34, 0.35) 0%, transparent 50%);
+  }
+
   .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;

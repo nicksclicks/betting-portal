@@ -53,7 +53,7 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
 
   if (isLocalMock) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow">
         <div className="card max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-white mb-2">Local mock mode</h1>
           <p className="text-neutral-400 text-sm">
@@ -66,13 +66,15 @@ export function LoginPage({ onNavigate }: { onNavigate: (path: string) => void }
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black py-12">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-lgm-glow py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 rounded-lg border border-neutral-700 items-center justify-center bg-neutral-950 mb-4">
-            <span className="text-white font-serif text-xl font-bold">N</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Nick&apos;s Bets</h1>
+          <img
+            src="/lgm-tracker-logo.png?v=2"
+            alt="LGM Tracker"
+            className="h-16 w-auto max-w-[14rem] mx-auto mb-4 object-contain"
+          />
+          <h1 className="text-2xl font-bold text-white tracking-tight">LGM Tracker</h1>
           <p className="text-neutral-500 text-sm mt-2">
             {mode === 'signin' ? 'Sign in to continue' : 'Create a basic account'}
           </p>

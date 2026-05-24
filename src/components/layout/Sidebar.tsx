@@ -42,17 +42,16 @@ export function Sidebar({ activeTab, onTabChange, onCollapseChange }: SidebarPro
         collapsed ? 'w-16' : 'w-56'
       }`}
     >
-      <div className="relative flex items-center p-4 border-b border-neutral-800">
+      <div className="relative flex items-center border-b border-neutral-800 px-3 py-3">
         <button
           onClick={() => onTabChange('odds')}
-          className={`flex items-center gap-3 ${collapsed ? 'mx-auto' : ''}`}
+          className={`flex items-center min-w-0 ${collapsed ? 'mx-auto' : 'w-full pr-4'}`}
         >
-          <div className="w-8 h-8 rounded border border-neutral-700 flex items-center justify-center bg-black">
-            <span className="text-white font-serif text-lg font-bold">N</span>
-          </div>
-          {!collapsed && (
-            <span className="text-white font-semibold text-lg tracking-tight">Nick's Bets</span>
-          )}
+          <img
+            src="/lgm-tracker-logo.png?v=2"
+            alt="LGM Tracker"
+            className={`object-contain ${collapsed ? 'h-8 w-8' : 'w-full h-auto'}`}
+          />
         </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
