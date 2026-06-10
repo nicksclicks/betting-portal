@@ -94,6 +94,14 @@ export const MARKET_TYPES = [
 
 export type MarketType = (typeof MARKET_TYPES)[number];
 
+/** Compact labels for the all-markets summary columns and sort chips. */
+export const MARKET_TYPE_SHORT_LABELS: Record<MarketType, string> = {
+  'Money Line': 'ML',
+  'Point Spread': 'Spread',
+  Totals: 'Totals',
+  'First Half': '1st Half',
+};
+
 export const DEPOSIT_STATUSES = ['active', 'completed', 'withdrawn'] as const;
 
 export type DepositStatus = (typeof DEPOSIT_STATUSES)[number];

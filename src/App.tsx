@@ -66,8 +66,17 @@ function ProfileMissingScreen() {
   );
 }
 
-function BettingPortalShell() {
-  const [activeTab, setActiveTab] = useState('odds');
+const TAB_IDS = ['odds', 'arbitrage', 'promo', 'rollover', 'deposits', 'bets', 'settings'];
+
+interface BettingPortalShellProps {
+  pathname: string;
+  navigate: (to: string, replace?: boolean) => void;
+}
+
+function BettingPortalShell({ pathname, navigate }: BettingPortalShellProps) {
+  const tabFromPath = pathname.replace(/^\//, '');
+  const activeTab = TAB_IDS.includes(tabFromPath) ? tabFromPath : 'odds';
+  const setActiveTab = (tab: string) => navigate(`/${tab}`);
   const [calculatorPrefill, setCalculatorPrefill] = useState<CalculatorPrefill | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -161,7 +170,7 @@ function App() {
     return <ProfileMissingScreen />;
   }
 
-  return <BettingPortalShell />;
+  return <BettingPortalShell pathname={pathname} navigate={navigate} />;
 }
 
 export default App;

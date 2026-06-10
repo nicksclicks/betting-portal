@@ -3,6 +3,7 @@ import { Activity, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from 'lu
 import {
   SPORTS,
   MARKET_TYPES,
+  MARKET_TYPE_SHORT_LABELS,
   ALL_SPORTSBOOKS,
   API_SPORTSBOOKS,
   Sport,
@@ -28,10 +29,22 @@ import {
 import { isLocalMockMode, supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
-import { calculateGameBestPercent } from '../../utils/bestPercent';
+import { AllMarketsGameCard } from './AllMarketsGameCard';
+import { AllMarketsRow } from './AllMarketsRow';
+import { MarketDrawer } from './MarketDrawer';
+import { calculateGameBestPercent, type BestPercentResult } from '../../utils/bestPercent';
 import { gameHasSelectedMarketLines } from '../../utils/marketOdds';
 import { emptyGameSidePick, type GameSidePick } from './useOddsGameInteraction';
 import { SyncedHorizontalScroll } from '../shared/SyncedHorizontalScroll';
+
+/** 'All' switches the board to the all-markets summary view. */
+type MarketFilterValue = MarketType | 'All';
+type OddsSortKey = 'time' | 'bestPercent' | MarketType;
+
+/** Picks in the all-markets drill-ins are tracked per game *and* market. */
+function marketPickKey(gameId: string, market: MarketType): string {
+  return `${gameId}::${market}`;
+}
 
 interface OddsBoardProps {
   onOddsClick: (data: {
@@ -85,8 +98,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [selectedSports, setSelectedSports] = useState<Sport[]>(() =>
     readSessionFilter<Sport[]>('selectedSports', [])
   );
-  const [marketFilter, setMarketFilter] = useState<MarketType>(() =>
-    readSessionFilter<MarketType>('marketFilter', 'Money Line')
+  const [marketFilter, setMarketFilter] = useState<MarketFilterValue>(() =>
+    readSessionFilter<MarketFilterValue>('marketFilter', 'Money Line')
   );
   const [selectedBooks, setSelectedBooks] = useState<Sportsbook[]>(() =>
     readSessionFilter<Sportsbook[]>('selectedBooks', [...API_SPORTSBOOKS])
@@ -98,9 +111,13 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   // Only show the spinner when we have nothing cached to show.
   const [loading, setLoading] = useState(() => readCachedGames() === null);
   const [lastLiveSync, setLastLiveSync] = useState<Date | null>(() => readLastOddsEdgeSync());
-  const [sortKey, setSortKey] = useState<'time' | 'bestPercent'>('time');
+  const [sortKey, setSortKey] = useState<OddsSortKey>('time');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [gamePicks, setGamePicks] = useState<Record<string, GameSidePick>>({});
+  // All-markets view: which market is expanded inline per game (desktop)…
+  const [expandedMarkets, setExpandedMarkets] = useState<Record<string, MarketType | null>>({});
+  // …and which game+market the bottom sheet shows (mobile).
+  const [openSheet, setOpenSheet] = useState<{ gameId: string; market: MarketType } | null>(null);
   const [syncedFilterKey, setSyncedFilterKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const filterKeyRef = useRef('');
@@ -237,15 +254,17 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     return () => ac.abort();
   }, [performOddsLoad]);
 
-  const gamesWithBestPercent = useMemo(() => {
+  const gamesWithMarketBests = useMemo(() => {
     return games.map((game) => ({
       game,
-      bestPercent: calculateGameBestPercent(game, marketFilter, selectedBooks),
+      marketBests: Object.fromEntries(
+        MARKET_TYPES.map((market) => [market, calculateGameBestPercent(game, market, selectedBooks)])
+      ) as Record<MarketType, BestPercentResult | null>,
     }));
-  }, [games, marketFilter, selectedBooks]);
+  }, [games, selectedBooks]);
 
   const filteredGames = useMemo(() => {
-    let filtered = gamesWithBestPercent;
+    let filtered = gamesWithMarketBests;
 
     // Drop games whose start time has already passed.
     filtered = filtered.filter((g) => g.game.gameTime.getTime() > now);
@@ -255,38 +274,93 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     }
 
     filtered = filtered.filter((g) =>
-      gameHasSelectedMarketLines(g.game, marketFilter, selectedBooks)
+      marketFilter === 'All'
+        ? MARKET_TYPES.some((market) => gameHasSelectedMarketLines(g.game, market, selectedBooks))
+        : gameHasSelectedMarketLines(g.game, marketFilter, selectedBooks)
     );
 
+    // 'bestPercent' sorts the single-market view; market-type keys sort the all-markets view.
+    const percentMarket =
+      sortKey === 'bestPercent'
+        ? marketFilter === 'All'
+          ? null
+          : marketFilter
+        : sortKey !== 'time'
+          ? sortKey
+          : null;
+
     filtered = [...filtered].sort((a, b) => {
-      const cmp =
-        sortKey === 'bestPercent'
-          ? (a.bestPercent?.percent ?? -Infinity) - (b.bestPercent?.percent ?? -Infinity)
-          : a.game.gameTime.getTime() - b.game.gameTime.getTime();
+      const cmp = percentMarket
+        ? (a.marketBests[percentMarket]?.percent ?? -Infinity) -
+          (b.marketBests[percentMarket]?.percent ?? -Infinity)
+        : a.game.gameTime.getTime() - b.game.gameTime.getTime();
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
     return filtered;
-  }, [gamesWithBestPercent, selectedSports, marketFilter, sortKey, sortDir, selectedBooks, now]);
+  }, [gamesWithMarketBests, selectedSports, marketFilter, sortKey, sortDir, selectedBooks, now]);
+
+  // Hide market columns with no data anywhere (e.g. First Half until the API syncs it).
+  const visibleMarkets = useMemo(
+    () => MARKET_TYPES.filter((market) => filteredGames.some((g) => g.game.odds[market] !== undefined)),
+    [filteredGames]
+  );
 
   const tableMinWidth = useMemo(() => {
+    if (marketFilter === 'All') {
+      return 380 + visibleMarkets.length * 140;
+    }
     return 520 + selectedBooks.length * 80;
-  }, [selectedBooks.length]);
+  }, [marketFilter, visibleMarkets.length, selectedBooks.length]);
 
   // Clicking the active column flips direction; clicking a new column resets to its default.
-  const handleSort = (key: 'time' | 'bestPercent') => {
+  const handleSort = (key: OddsSortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      setSortDir(key === 'bestPercent' ? 'desc' : 'asc');
+      setSortDir(key === 'time' ? 'asc' : 'desc');
     }
   };
 
-  const sortIcon = (key: 'time' | 'bestPercent') => {
+  const sortIcon = (key: OddsSortKey) => {
     if (sortKey !== key) return <ArrowUpDown className="w-3 h-3" />;
     return sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
   };
+
+  const handleMarketFilterChange = (value: MarketFilterValue) => {
+    if (value === marketFilter) return;
+    const modeChanged = (value === 'All') !== (marketFilter === 'All');
+    setMarketFilter(value);
+    // Sort keys and expansions from one view don't apply to the other.
+    if (modeChanged) {
+      setSortKey('time');
+      setSortDir('asc');
+      setExpandedMarkets({});
+      setOpenSheet(null);
+    }
+  };
+
+  const toggleExpandedMarket = useCallback((gameId: string, market: MarketType) => {
+    setExpandedMarkets((prev) => ({
+      ...prev,
+      [gameId]: prev[gameId] === market ? null : market,
+    }));
+  }, []);
+
+  const sortOptions: { key: OddsSortKey; label: string }[] =
+    marketFilter === 'All'
+      ? [
+          { key: 'time', label: 'Time' },
+          ...visibleMarkets.map((market) => ({
+            key: market as OddsSortKey,
+            label: `${MARKET_TYPE_SHORT_LABELS[market]} %`,
+          })),
+        ]
+      : [
+          { key: 'time', label: 'Time' },
+          { key: 'bestPercent', label: 'Best %' },
+        ];
 
   const toggleBook = (book: Sportsbook) => {
     setSelectedBooks((prev) =>
@@ -374,7 +448,11 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             {filtersDirty && (
               <p className="text-lime-400/80">Filters changed — Refresh will pull fresh odds from the API</p>
             )}
-            <p>Tap an odd to highlight it; tap again to open Arbitrage. Unselected rows use the green best line.</p>
+            <p>
+              {marketFilter === 'All'
+                ? 'Tap a market to expand every book; tap the % to open Arbitrage with the best lines.'
+                : 'Tap an odd to highlight it; tap again to open Arbitrage. Unselected rows use the green best line.'}
+            </p>
           </div>
         </div>
 
@@ -447,9 +525,10 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                 <label className="label">Market Type</label>
                 <select
                   value={marketFilter}
-                  onChange={(e) => setMarketFilter(e.target.value as MarketType)}
+                  onChange={(e) => handleMarketFilterChange(e.target.value as MarketFilterValue)}
                   className="select-field text-sm md:text-base"
                 >
+                  <option value="All">All Markets</option>
                   {MARKET_TYPES.map((market) => (
                     <option key={market} value={market}>
                       {market}
@@ -498,30 +577,21 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
           {!loading && filteredGames.length > 0 && (
             <div className="md:hidden flex items-center justify-center gap-2 flex-wrap px-4 py-3 border-b border-neutral-800 bg-neutral-950">
               <span className="text-xs text-neutral-500">Sort</span>
-              <button
-                type="button"
-                onClick={() => handleSort('time')}
-                className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center gap-1 ${
-                  sortKey === 'time'
-                    ? 'border-lime-500/40 text-lime-400 bg-lime-500/5 active:opacity-90'
-                    : 'border-neutral-800 text-neutral-400 hover:border-neutral-700 active:bg-neutral-900 active:border-neutral-600'
-                }`}
-              >
-                Time
-                {sortIcon('time')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSort('bestPercent')}
-                className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center gap-1 ${
-                  sortKey === 'bestPercent'
-                    ? 'border-lime-500/40 text-lime-400 bg-lime-500/5 active:opacity-90'
-                    : 'border-neutral-800 text-neutral-400 hover:border-neutral-700 active:bg-neutral-900 active:border-neutral-600'
-                }`}
-              >
-                Best %
-                {sortIcon('bestPercent')}
-              </button>
+              {sortOptions.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleSort(key)}
+                  className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center gap-1 ${
+                    sortKey === key
+                      ? 'border-lime-500/40 text-lime-400 bg-lime-500/5 active:opacity-90'
+                      : 'border-neutral-800 text-neutral-400 hover:border-neutral-700 active:bg-neutral-900 active:border-neutral-600'
+                  }`}
+                >
+                  {label}
+                  {sortIcon(key)}
+                </button>
+              ))}
             </div>
           )}
 
@@ -534,18 +604,30 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
           ) : (
             <>
               <div className="md:hidden">
-                {filteredGames.map(({ game, bestPercent }) => (
-                  <OddsGameCard
-                    key={game.id}
-                    game={game}
-                    marketType={marketFilter}
-                    selectedBooks={selectedBooks}
-                    bestPercent={bestPercent}
-                    onOddsClick={onOddsClick}
-                    pick={getGamePick(game.id)}
-                    onPickChange={(pick) => setGamePick(game.id, pick)}
-                  />
-                ))}
+                {filteredGames.map(({ game, marketBests }) =>
+                  marketFilter === 'All' ? (
+                    <AllMarketsGameCard
+                      key={game.id}
+                      game={game}
+                      markets={visibleMarkets}
+                      selectedBooks={selectedBooks}
+                      marketBests={marketBests}
+                      onOpenMarket={(market) => setOpenSheet({ gameId: game.id, market })}
+                      onOddsClick={onOddsClick}
+                    />
+                  ) : (
+                    <OddsGameCard
+                      key={game.id}
+                      game={game}
+                      marketType={marketFilter}
+                      selectedBooks={selectedBooks}
+                      bestPercent={marketBests[marketFilter]}
+                      onOddsClick={onOddsClick}
+                      pick={getGamePick(game.id)}
+                      onPickChange={(pick) => setGamePick(game.id, pick)}
+                    />
+                  )
+                )}
               </div>
               <SyncedHorizontalScroll className="hidden md:block">
                 <table className="w-full" style={{ minWidth: tableMinWidth }}>
@@ -569,44 +651,83 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                           {sortIcon('time')}
                         </button>
                       </th>
-                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                        <button
-                          type="button"
-                          onClick={() => handleSort('bestPercent')}
-                          className={`touch-manipulation inline-flex items-center gap-1 rounded-md hover:text-white active:text-white transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:justify-center pointer-coarse:px-2 ${
-                            sortKey === 'bestPercent' ? 'text-lime-400' : ''
-                          }`}
-                        >
-                          Best %
-                          {sortIcon('bestPercent')}
-                        </button>
-                      </th>
-                      {selectedBooks.map((book) => (
-                        <th
-                          key={book}
-                          className="text-center py-3 md:py-4 px-1 md:px-2 text-xs md:text-sm font-medium text-neutral-500 min-w-[60px] md:min-w-[80px]"
-                        >
-                          {book}
-                        </th>
-                      ))}
-                      <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
-                        Best
-                      </th>
+                      {marketFilter === 'All' ? (
+                        visibleMarkets.map((market) => (
+                          <th
+                            key={market}
+                            className="text-center py-3 md:py-4 px-2 text-xs md:text-sm font-medium text-neutral-500 min-w-[120px]"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleSort(market)}
+                              className={`touch-manipulation inline-flex items-center gap-1 rounded-md hover:text-white active:text-white transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:justify-center pointer-coarse:px-2 ${
+                                sortKey === market ? 'text-lime-400' : ''
+                              }`}
+                            >
+                              {MARKET_TYPE_SHORT_LABELS[market]}
+                              {sortIcon(market)}
+                            </button>
+                          </th>
+                        ))
+                      ) : (
+                        <>
+                          <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('bestPercent')}
+                              className={`touch-manipulation inline-flex items-center gap-1 rounded-md hover:text-white active:text-white transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:justify-center pointer-coarse:px-2 ${
+                                sortKey === 'bestPercent' ? 'text-lime-400' : ''
+                              }`}
+                            >
+                              Best %
+                              {sortIcon('bestPercent')}
+                            </button>
+                          </th>
+                          {selectedBooks.map((book) => (
+                            <th
+                              key={book}
+                              className="text-center py-3 md:py-4 px-1 md:px-2 text-xs md:text-sm font-medium text-neutral-500 min-w-[60px] md:min-w-[80px]"
+                            >
+                              {book}
+                            </th>
+                          ))}
+                          <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
+                            Best
+                          </th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredGames.map(({ game, bestPercent }) => (
-                      <OddsRow
-                        key={game.id}
-                        game={game}
-                        marketType={marketFilter}
-                        selectedBooks={selectedBooks}
-                        bestPercent={bestPercent}
-                        onOddsClick={onOddsClick}
-                        pick={getGamePick(game.id)}
-                        onPickChange={(pick) => setGamePick(game.id, pick)}
-                      />
-                    ))}
+                    {filteredGames.map(({ game, marketBests }) =>
+                      marketFilter === 'All' ? (
+                        <AllMarketsRow
+                          key={game.id}
+                          game={game}
+                          markets={visibleMarkets}
+                          selectedBooks={selectedBooks}
+                          marketBests={marketBests}
+                          expandedMarket={expandedMarkets[game.id] ?? null}
+                          onToggleExpand={(market) => toggleExpandedMarket(game.id, market)}
+                          onOddsClick={onOddsClick}
+                          getPick={(market) => getGamePick(marketPickKey(game.id, market))}
+                          onPickChange={(market, update) =>
+                            setGamePick(marketPickKey(game.id, market), update)
+                          }
+                        />
+                      ) : (
+                        <OddsRow
+                          key={game.id}
+                          game={game}
+                          marketType={marketFilter}
+                          selectedBooks={selectedBooks}
+                          bestPercent={marketBests[marketFilter]}
+                          onOddsClick={onOddsClick}
+                          pick={getGamePick(game.id)}
+                          onPickChange={(pick) => setGamePick(game.id, pick)}
+                        />
+                      )
+                    )}
                   </tbody>
                 </table>
               </SyncedHorizontalScroll>
@@ -614,6 +735,28 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
           )}
         </div>
       </div>
+
+      {openSheet &&
+        (() => {
+          const entry = filteredGames.find((g) => g.game.id === openSheet.gameId);
+          if (!entry) return null;
+          const pickKey = marketPickKey(openSheet.gameId, openSheet.market);
+          return (
+            <MarketDrawer
+              game={entry.game}
+              marketType={openSheet.market}
+              selectedBooks={selectedBooks}
+              bestPercent={entry.marketBests[openSheet.market]}
+              onOddsClick={(payload) => {
+                setOpenSheet(null);
+                onOddsClick(payload);
+              }}
+              pick={getGamePick(pickKey)}
+              onPickChange={(update) => setGamePick(pickKey, update)}
+              onClose={() => setOpenSheet(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

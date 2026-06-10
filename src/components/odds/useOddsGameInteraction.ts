@@ -14,6 +14,12 @@ export type OddsClickPayload = {
 
 export type SidePickSource = 'user' | 'recommendation';
 
+export type OddsCellActivation = {
+  team: string;
+  odds: number;
+  book: Sportsbook;
+};
+
 export type SidePick = {
   book: Sportsbook;
   odds: number;
@@ -53,6 +59,17 @@ export function getOddsCellHighlightClass(
   }
 
   return classes.join(' ');
+}
+
+export function formatGameTime(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }).format(date);
 }
 
 export function getMarketSpreadLabel(
@@ -144,7 +161,6 @@ export function useOddsGameInteraction(
     (isHome: boolean, cell: OddsCellActivation) => {
       if (!bestLines) return;
 
-      const side: SideRow = isHome ? 'home' : 'away';
       const sideKey = isHome ? 'home' : 'away';
       const currentPick = pickRef.current[sideKey];
       const isHighlighted = currentPick?.book === cell.book;
@@ -212,17 +228,6 @@ export function useOddsGameInteraction(
         bookB: bestPercent.homeBook,
       });
     }
-  };
-
-  const formatGameTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZoneName: 'short',
-    }).format(date);
   };
 
   return {
