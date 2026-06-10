@@ -19,41 +19,55 @@ export function calculateImpliedProbability(american: number): number {
   return Math.abs(american) / (Math.abs(american) + 100);
 }
 
-export interface ArbitrageResult {
-  betA: number;
-  betB: number;
-  profit: number;
-  profitPercent: number;
-  totalStake: number;
+export interface HedgeResult {
+  betA: number;        // stake on side A
+  betB: number;        // stake on side B
+  totalStake: number;  // betA + betB
+  totalPayout: number; // winning-leg payout (balanced: both legs equal)
+  winLoss: number;     // totalPayout - totalStake
+  roi: number;         // winLoss / totalPayout * 100
 }
 
-export function calculateArbitrage(
-  totalStake: number,
+function roundHedge(result: HedgeResult): HedgeResult {
+  return {
+    betA: Math.round(result.betA * 100) / 100,
+    betB: Math.round(result.betB * 100) / 100,
+    totalStake: Math.round(result.totalStake * 100) / 100,
+    totalPayout: Math.round(result.totalPayout * 100) / 100,
+    winLoss: Math.round(result.winLoss * 100) / 100,
+    roi: Math.round(result.roi * 100) / 100,
+  };
+}
+
+// Source = Side A amount; derive Side B hedge.
+export function calculateHedge(
+  betA: number,
   oddsA: number,
   oddsB: number
-): ArbitrageResult {
-  const decimalA = americanToDecimal(oddsA);
-  const decimalB = americanToDecimal(oddsB);
+): HedgeResult {
+  const decA = americanToDecimal(oddsA);
+  const decB = americanToDecimal(oddsB);
 
-  const impliedSum = (1 / decimalA) + (1 / decimalB);
+  const betB = (betA * decA) / decB;
+  const totalStake = betA + betB;
+  const totalPayout = betA * decA;
+  const winLoss = totalPayout - totalStake;
+  const roi = totalPayout === 0 ? 0 : (winLoss / totalPayout) * 100;
 
-  const betA = (totalStake / decimalA) / impliedSum;
-  const betB = (totalStake / decimalB) / impliedSum;
+  return roundHedge({ betA, betB, totalStake, totalPayout, winLoss, roi });
+}
 
-  const payoutA = betA * decimalA;
-  const payoutB = betB * decimalB;
+// Source = Side B amount; derive Side A, then reuse calculateHedge.
+export function calculateFromHedge(
+  betB: number,
+  oddsA: number,
+  oddsB: number
+): HedgeResult {
+  const decA = americanToDecimal(oddsA);
+  const decB = americanToDecimal(oddsB);
 
-  const guaranteedPayout = Math.min(payoutA, payoutB);
-  const profit = guaranteedPayout - totalStake;
-  const profitPercent = (profit / totalStake) * 100;
-
-  return {
-    betA: Math.round(betA * 100) / 100,
-    betB: Math.round(betB * 100) / 100,
-    profit: Math.round(profit * 100) / 100,
-    profitPercent: Math.round(profitPercent * 100) / 100,
-    totalStake,
-  };
+  const betA = (betB * decB) / decA;
+  return calculateHedge(betA, oddsA, oddsB);
 }
 
 export interface PromoConversionResult {

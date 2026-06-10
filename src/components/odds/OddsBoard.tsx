@@ -1,14 +1,30 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Activity, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
-import { SPORTS, MARKET_TYPES, ALL_SPORTSBOOKS, Sport, MarketType, Sportsbook } from '../../constants/sportsbooks';
+import { Activity, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  SPORTS,
+  MARKET_TYPES,
+  ALL_SPORTSBOOKS,
+  API_SPORTSBOOKS,
+  Sport,
+  MarketType,
+  Sportsbook,
+} from '../../constants/sportsbooks';
 import { GameOdds, getMockOddsApiPayload } from '../../data/mockOdds';
 import {
   fetchOddsRows,
+  mergeOddsApiGames,
   oddsRowsToApiGames,
   refreshOddsViaEdgeFunction,
   type OddsApiGame,
 } from '../../lib/oddsFromSupabase';
 import { canInvokeOddsEdgeSync, readLastOddsEdgeSync, writeLastOddsEdgeSync } from '../../lib/oddsEdgeSync';
+import { readSessionFilter, writeSessionFilter } from '../../lib/sessionFilters';
+import {
+  hasPulledOddsThisSession,
+  markOddsPulledThisSession,
+  readCachedGames,
+  writeCachedGames,
+} from '../../lib/oddsCache';
 import { isLocalMockMode, supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
@@ -66,24 +82,34 @@ function transformApiGames(apiGames: OddsApiGame[]): GameOdds[] {
 
 export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedSports, setSelectedSports] = useState<Sport[]>([]);
-  const [marketFilter, setMarketFilter] = useState<MarketType>('Money Line');
-  const [selectedBooks, setSelectedBooks] = useState<Sportsbook[]>([
-    'Bovada',
-    'FanDuel',
-    'DraftKings',
-    'BetMGM',
-  ]);
-  const [maxFavorite, setMaxFavorite] = useState(-300);
-  const [maxUnderdog, setMaxUnderdog] = useState(300);
-  const [maxLossPercent, setMaxLossPercent] = useState(4);
-  const [games, setGames] = useState<GameOdds[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedSports, setSelectedSports] = useState<Sport[]>(() =>
+    readSessionFilter<Sport[]>('selectedSports', [])
+  );
+  const [marketFilter, setMarketFilter] = useState<MarketType>(() =>
+    readSessionFilter<MarketType>('marketFilter', 'Money Line')
+  );
+  const [selectedBooks, setSelectedBooks] = useState<Sportsbook[]>(() =>
+    readSessionFilter<Sportsbook[]>('selectedBooks', [...API_SPORTSBOOKS])
+  );
+  const [maxFavorite, setMaxFavorite] = useState(() => readSessionFilter('maxFavorite', -300));
+  const [maxUnderdog, setMaxUnderdog] = useState(() => readSessionFilter('maxUnderdog', 300));
+  const [maxLossPercent, setMaxLossPercent] = useState(() => readSessionFilter('maxLossPercent', 4));
+  const [games, setGames] = useState<GameOdds[]>(() => readCachedGames() ?? []);
+  // Only show the spinner when we have nothing cached to show.
+  const [loading, setLoading] = useState(() => readCachedGames() === null);
   const [lastLiveSync, setLastLiveSync] = useState<Date | null>(() => readLastOddsEdgeSync());
-  const [sortByBestPercent, setSortByBestPercent] = useState(false);
+  const [sortKey, setSortKey] = useState<'time' | 'bestPercent'>('time');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [gamePicks, setGamePicks] = useState<Record<string, GameSidePick>>({});
   const [syncedFilterKey, setSyncedFilterKey] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const filterKeyRef = useRef('');
+
+  // Tick every 30s so games drop off the list as soon as their start time passes.
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const currentFilterKey = useMemo(
     () =>
@@ -98,6 +124,16 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     [selectedSports, marketFilter, selectedBooks, maxFavorite, maxUnderdog, maxLossPercent]
   );
   filterKeyRef.current = currentFilterKey;
+
+  // Persist filters for the session so they survive reloads/navigation within the tab.
+  useEffect(() => {
+    writeSessionFilter('selectedSports', selectedSports);
+    writeSessionFilter('marketFilter', marketFilter);
+    writeSessionFilter('selectedBooks', selectedBooks);
+    writeSessionFilter('maxFavorite', maxFavorite);
+    writeSessionFilter('maxUnderdog', maxUnderdog);
+    writeSessionFilter('maxLossPercent', maxLossPercent);
+  }, [selectedSports, marketFilter, selectedBooks, maxFavorite, maxUnderdog, maxLossPercent]);
 
   const filtersDirty = syncedFilterKey !== null && currentFilterKey !== syncedFilterKey;
 
@@ -117,49 +153,62 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   );
 
   const performOddsLoad = useCallback(
-    async (options?: { signal?: AbortSignal; forceLiveSync?: boolean }) => {
+    async (options?: {
+      signal?: AbortSignal;
+      forceLiveSync?: boolean;
+      dbOnly?: boolean;
+      silent?: boolean;
+    }) => {
       const signal = options?.signal;
       const forceLiveSync = options?.forceLiveSync ?? false;
+      const dbOnly = options?.dbOnly ?? false;
+      const silent = options?.silent ?? false;
       const gone = () => signal?.aborted ?? false;
+      const applyGames = (next: GameOdds[]) => {
+        setGames(next);
+        writeCachedGames(next);
+      };
 
-      setLoading(true);
+      if (!silent) setLoading(true);
       let loadSucceeded = false;
       try {
         if (isLocalMockMode) {
           const data = getMockOddsApiPayload();
           if (gone()) return;
-          setGames(transformApiGames(data.games as OddsApiGame[]));
+          applyGames(transformApiGames(data.games as OddsApiGame[]));
           setLastLiveSync(new Date(data.updated));
           loadSucceeded = true;
           return;
         }
 
-        if (forceLiveSync || canInvokeOddsEdgeSync()) {
+        const loadFromDatabase = async () => {
+          const rows = await fetchOddsRows(supabase);
+          if (gone()) return null;
+          return oddsRowsToApiGames(rows);
+        };
+
+        if (!dbOnly && (forceLiveSync || canInvokeOddsEdgeSync())) {
           try {
             const { games: apiGames, updated } = await refreshOddsViaEdgeFunction();
             if (gone()) return;
             const syncTime = new Date(updated);
             writeLastOddsEdgeSync(syncTime);
             setLastLiveSync(syncTime);
-            if (apiGames.length > 0) {
-              setGames(transformApiGames(apiGames));
-            } else {
-              const rows = await fetchOddsRows(supabase);
-              if (gone()) return;
-              setGames(transformApiGames(oddsRowsToApiGames(rows)));
-            }
+            const dbGames = await loadFromDatabase();
+            if (gone() || dbGames === null) return;
+            applyGames(transformApiGames(mergeOddsApiGames(apiGames, dbGames)));
             loadSucceeded = true;
           } catch (error) {
             console.error('Error refreshing odds:', error);
-            const rows = await fetchOddsRows(supabase);
-            if (gone()) return;
-            setGames(transformApiGames(oddsRowsToApiGames(rows)));
+            const dbGames = await loadFromDatabase();
+            if (gone() || dbGames === null) return;
+            applyGames(transformApiGames(dbGames));
             loadSucceeded = true;
           }
         } else {
-          const rows = await fetchOddsRows(supabase);
-          if (gone()) return;
-          setGames(transformApiGames(oddsRowsToApiGames(rows)));
+          const dbGames = await loadFromDatabase();
+          if (gone() || dbGames === null) return;
+          applyGames(transformApiGames(dbGames));
           loadSucceeded = true;
         }
       } catch (error) {
@@ -176,7 +225,15 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
 
   useEffect(() => {
     const ac = new AbortController();
-    void performOddsLoad({ signal: ac.signal });
+    if (hasPulledOddsThisSession()) {
+      // Return visit: show the cached snapshot, then quietly refresh from the DB.
+      // No live API pull and no spinner — that only happens via the Refresh button.
+      void performOddsLoad({ signal: ac.signal, dbOnly: true, silent: true });
+    } else {
+      // First load this session: do the one live pull.
+      markOddsPulledThisSession();
+      void performOddsLoad({ signal: ac.signal });
+    }
     return () => ac.abort();
   }, [performOddsLoad]);
 
@@ -190,6 +247,9 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const filteredGames = useMemo(() => {
     let filtered = gamesWithBestPercent;
 
+    // Drop games whose start time has already passed.
+    filtered = filtered.filter((g) => g.game.gameTime.getTime() > now);
+
     if (selectedSports.length > 0) {
       filtered = filtered.filter((g) => selectedSports.includes(g.game.sport));
     }
@@ -198,24 +258,35 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       gameHasSelectedMarketLines(g.game, marketFilter, selectedBooks)
     );
 
-    if (sortByBestPercent) {
-      filtered = [...filtered].sort((a, b) => {
-        const aPercent = a.bestPercent?.percent ?? -Infinity;
-        const bPercent = b.bestPercent?.percent ?? -Infinity;
-        return bPercent - aPercent;
-      });
-    } else {
-      filtered = [...filtered].sort((a, b) =>
-        a.game.gameTime.getTime() - b.game.gameTime.getTime()
-      );
-    }
+    filtered = [...filtered].sort((a, b) => {
+      const cmp =
+        sortKey === 'bestPercent'
+          ? (a.bestPercent?.percent ?? -Infinity) - (b.bestPercent?.percent ?? -Infinity)
+          : a.game.gameTime.getTime() - b.game.gameTime.getTime();
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
 
     return filtered;
-  }, [gamesWithBestPercent, selectedSports, marketFilter, sortByBestPercent, selectedBooks]);
+  }, [gamesWithBestPercent, selectedSports, marketFilter, sortKey, sortDir, selectedBooks, now]);
 
   const tableMinWidth = useMemo(() => {
     return 520 + selectedBooks.length * 80;
   }, [selectedBooks.length]);
+
+  // Clicking the active column flips direction; clicking a new column resets to its default.
+  const handleSort = (key: 'time' | 'bestPercent') => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'bestPercent' ? 'desc' : 'asc');
+    }
+  };
+
+  const sortIcon = (key: 'time' | 'bestPercent') => {
+    if (sortKey !== key) return <ArrowUpDown className="w-3 h-3" />;
+    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
+  };
 
   const toggleBook = (book: Sportsbook) => {
     setSelectedBooks((prev) =>
@@ -253,8 +324,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       <div className="text-center max-w-2xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 md:mb-4">Low Hold</h1>
         <p className="text-neutral-400 text-sm md:text-base">
-          Compare odds across sportsbooks. Refresh reloads from the database; a live upstream sync runs at most once
-          per minute, or immediately after you change filters and press Refresh.
+          Compare odds across sportsbooks with live lines from The Odds API. Offshore books without API coverage
+          (e.g. Betwhale, Heritage) appear in deposits/bets only. Refresh syncs upstream at most once per minute.
         </p>
       </div>
 
@@ -429,25 +500,27 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
               <span className="text-xs text-neutral-500">Sort</span>
               <button
                 type="button"
-                onClick={() => setSortByBestPercent(false)}
-                className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center ${
-                  !sortByBestPercent
+                onClick={() => handleSort('time')}
+                className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center gap-1 ${
+                  sortKey === 'time'
                     ? 'border-lime-500/40 text-lime-400 bg-lime-500/5 active:opacity-90'
                     : 'border-neutral-800 text-neutral-400 hover:border-neutral-700 active:bg-neutral-900 active:border-neutral-600'
                 }`}
               >
                 Time
+                {sortIcon('time')}
               </button>
               <button
                 type="button"
-                onClick={() => setSortByBestPercent(true)}
-                className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center ${
-                  sortByBestPercent
+                onClick={() => handleSort('bestPercent')}
+                className={`touch-manipulation text-xs min-h-[44px] px-3 py-2.5 rounded-lg border transition-colors inline-flex items-center justify-center gap-1 ${
+                  sortKey === 'bestPercent'
                     ? 'border-lime-500/40 text-lime-400 bg-lime-500/5 active:opacity-90'
                     : 'border-neutral-800 text-neutral-400 hover:border-neutral-700 active:bg-neutral-900 active:border-neutral-600'
                 }`}
               >
                 Best %
+                {sortIcon('bestPercent')}
               </button>
             </div>
           )}
@@ -487,25 +560,25 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                       <th className="text-left py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
                         <button
                           type="button"
-                          onClick={() => setSortByBestPercent(false)}
+                          onClick={() => handleSort('time')}
                           className={`touch-manipulation inline-flex items-center gap-1 rounded-md hover:text-white active:text-white transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:justify-center pointer-coarse:px-2 ${
-                            !sortByBestPercent ? 'text-lime-400' : ''
+                            sortKey === 'time' ? 'text-lime-400' : ''
                           }`}
                         >
                           Time
-                          <ArrowUpDown className="w-3 h-3" />
+                          {sortIcon('time')}
                         </button>
                       </th>
                       <th className="text-center py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm font-medium text-neutral-500">
                         <button
                           type="button"
-                          onClick={() => setSortByBestPercent(true)}
+                          onClick={() => handleSort('bestPercent')}
                           className={`touch-manipulation inline-flex items-center gap-1 rounded-md hover:text-white active:text-white transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] pointer-coarse:justify-center pointer-coarse:px-2 ${
-                            sortByBestPercent ? 'text-lime-400' : ''
+                            sortKey === 'bestPercent' ? 'text-lime-400' : ''
                           }`}
                         >
                           Best %
-                          <ArrowUpDown className="w-3 h-3" />
+                          {sortIcon('bestPercent')}
                         </button>
                       </th>
                       {selectedBooks.map((book) => (

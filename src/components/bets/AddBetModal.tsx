@@ -34,15 +34,32 @@ const createEmptyBet = (): BetEntry => ({
   isOddsBoost: false,
 });
 
+/** Today's local date as a `yyyy-mm-dd` string for the date input. */
+const todayInputValue = (): string => {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+
+/** Convert a `yyyy-mm-dd` input to an ISO timestamp anchored at local noon (avoids TZ day-shift). */
+const inputDateToIso = (input: string): string | null => {
+  const [y, m, d] = input.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+};
+
 export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetModalProps) {
   const { session } = useAuth();
   const [bets, setBets] = useState<BetEntry[]>([createEmptyBet(), createEmptyBet()]);
+  const [betDate, setBetDate] = useState(todayInputValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setSubmitError(null);
+    setBetDate(todayInputValue());
     if (initialBets && initialBets.length > 0) {
       setBets(
         initialBets.map((b) => ({
@@ -112,6 +129,9 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
       return;
     }
 
+    // Only override created_at for retroactive dates; same-day bets keep the DB's now().
+    const createdAt = betDate === todayInputValue() ? null : inputDateToIso(betDate);
+
     const betsToInsert: BetInsert[] = parsedBets.map(({ bet, odds, amountStaked }) => ({
       bet_name: bet.betName,
       sportsbook: bet.sportsbook,
@@ -121,6 +141,7 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
       is_odds_boost: bet.isOddsBoost,
       group_id: groupId,
       user_id: userId,
+      ...(createdAt ? { created_at: createdAt } : {}),
     }));
 
     const { error } = await supabase.from('bets').insert(betsToInsert);
@@ -137,6 +158,7 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
     onSuccess?.();
     onClose();
     setBets([createEmptyBet(), createEmptyBet()]);
+    setBetDate(todayInputValue());
   };
 
   if (!isOpen) return null;
@@ -156,6 +178,19 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
         </div>
 
         <div className="p-4 sm:p-6 space-y-6 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="sm:max-w-xs">
+            <label className="block text-sm text-neutral-400 mb-2">Date</label>
+            <input
+              type="date"
+              value={betDate}
+              max={todayInputValue()}
+              onChange={(e) => setBetDate(e.target.value || todayInputValue())}
+              className="w-full px-4 py-3 bg-neutral-950 border border-neutral-700 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors [color-scheme:dark]"
+            />
+          </div>
+
+          <hr className="border-neutral-800" />
+
           {bets.map((bet, index) => (
             <div key={bet.id} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

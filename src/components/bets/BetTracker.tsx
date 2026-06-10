@@ -4,18 +4,24 @@ import { supabase } from '../../lib/supabase';
 import { Bet } from '../../types/database';
 import { AddBetModal } from './AddBetModal';
 import { BetMobileCard } from './BetMobileCard';
+import { ProfitCalendar } from './ProfitCalendar';
 import { formatCurrency } from '../../utils/odds';
+import { betProfitDate, dayKey } from '../../utils/betProfit';
 
 type BetStatus = 'all' | 'pending' | 'won' | 'lost';
+type ViewMode = 'list' | 'calendar';
 
 export function BetTracker() {
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<BetStatus>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [highlightDayKey, setHighlightDayKey] = useState<string | null>(null);
 
-  const fetchBets = async () => {
-    setLoading(true);
+  // `silent` refetches keep the current list on screen (no spinner flash) while data refreshes.
+  const fetchBets = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     const { data, error } = await supabase
       .from('bets')
       .select('*')
@@ -24,7 +30,7 @@ export function BetTracker() {
     if (!error && data) {
       setBets(data);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
@@ -32,13 +38,20 @@ export function BetTracker() {
   }, []);
 
   const updateBetStatus = async (id: string, status: Bet['status']) => {
+    const settledAt = status !== 'pending' ? new Date().toISOString() : null;
+    // Optimistically update in place so the UI doesn't flash/reload.
+    setBets((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status, settled_at: settledAt } : b))
+    );
+
     const { error } = await supabase
       .from('bets')
-      .update({ status, settled_at: status !== 'pending' ? new Date().toISOString() : null })
+      .update({ status, settled_at: settledAt })
       .eq('id', id);
 
-    if (!error) {
-      fetchBets();
+    if (error) {
+      // Reconcile with the server if the write failed.
+      fetchBets({ silent: true });
     }
   };
 
@@ -46,11 +59,39 @@ export function BetTracker() {
     if (!confirm('Are you sure you want to delete this bet?')) {
       return;
     }
+    setBets((prev) => prev.filter((b) => b.id !== id));
     const { error } = await supabase.from('bets').delete().eq('id', id);
-    if (!error) {
-      fetchBets();
+    if (error) {
+      fetchBets({ silent: true });
     }
   };
+
+  // Jump from the calendar to the list and briefly pulse that day's bets.
+  const handleSelectDay = (key: string) => {
+    setViewMode('list');
+    setStatusFilter('all');
+    setHighlightDayKey(key);
+  };
+
+  // When a day is selected, scroll its first bet into view; clear the pulse after it plays.
+  useEffect(() => {
+    if (!highlightDayKey) return;
+    const raf = requestAnimationFrame(() => {
+      const els = document.querySelectorAll<HTMLElement>('[data-bet-highlight="true"]');
+      for (const el of els) {
+        // Pick the element from whichever layout (mobile/desktop) is currently visible.
+        if (el.offsetParent !== null) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          break;
+        }
+      }
+    });
+    const timer = setTimeout(() => setHighlightDayKey(null), 2200);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [highlightDayKey]);
 
   const exportToCSV = () => {
     const headers = [
@@ -183,25 +224,45 @@ export function BetTracker() {
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4 mb-4 md:mb-6">
           <div className="flex items-center gap-2 md:gap-4">
-            <p className="text-neutral-500 text-xs md:text-sm">
-              {filteredBets.length} bet{filteredBets.length !== 1 ? 's' : ''}
-            </p>
-            <div className="flex gap-0.5 md:gap-1">
-              {(['all', 'pending', 'won', 'lost'] as BetStatus[]).map((status) => (
+            <div className="flex gap-0.5 md:gap-1 bg-neutral-950 border border-neutral-800 rounded-lg p-0.5">
+              {(['list', 'calendar'] as ViewMode[]).map((mode) => (
                 <button
                   type="button"
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`touch-manipulation inline-flex items-center justify-center px-2 md:px-3 py-1 md:py-1.5 pointer-coarse:min-h-[44px] text-[10px] md:text-xs rounded-lg transition-colors capitalize active:bg-neutral-800 ${
-                    statusFilter === status
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`touch-manipulation inline-flex items-center justify-center px-2.5 md:px-3 py-1 md:py-1.5 pointer-coarse:min-h-[40px] text-[10px] md:text-xs rounded-md transition-colors capitalize ${
+                    viewMode === mode
                       ? 'bg-cyan-500 text-black font-medium active:bg-cyan-400'
                       : 'text-neutral-500 hover:text-white active:text-white'
                   }`}
                 >
-                  {status}
+                  {mode}
                 </button>
               ))}
             </div>
+            {viewMode === 'list' && (
+              <>
+                <p className="text-neutral-500 text-xs md:text-sm">
+                  {filteredBets.length} bet{filteredBets.length !== 1 ? 's' : ''}
+                </p>
+                <div className="flex gap-0.5 md:gap-1">
+                  {(['all', 'pending', 'won', 'lost'] as BetStatus[]).map((status) => (
+                    <button
+                      type="button"
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className={`touch-manipulation inline-flex items-center justify-center px-2 md:px-3 py-1 md:py-1.5 pointer-coarse:min-h-[44px] text-[10px] md:text-xs rounded-lg transition-colors capitalize active:bg-neutral-800 ${
+                        statusFilter === status
+                          ? 'bg-cyan-500 text-black font-medium active:bg-cyan-400'
+                          : 'text-neutral-500 hover:text-white active:text-white'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={exportToCSV} className="touch-manipulation btn-secondary text-xs md:text-sm flex items-center gap-2">
@@ -219,6 +280,13 @@ export function BetTracker() {
           </div>
         </div>
 
+        {viewMode === 'calendar' ? (
+          loading ? (
+            <div className="card text-center py-16 text-neutral-500">Loading...</div>
+          ) : (
+            <ProfitCalendar bets={bets} onSelectDay={handleSelectDay} />
+          )
+        ) : (
         <div className="card overflow-hidden p-0">
           {loading ? (
             <div className="text-center py-16 text-neutral-500">Loading...</div>
@@ -242,6 +310,7 @@ export function BetTracker() {
                       onMarkWon={(id) => updateBetStatus(id, 'won')}
                       onMarkLost={(id) => updateBetStatus(id, 'lost')}
                       onDelete={deleteBet}
+                      highlighted={highlightDayKey === dayKey(betProfitDate(bet))}
                     />
                   ))
                 )}
@@ -264,9 +333,14 @@ export function BetTracker() {
                       groupBets.map((bet, idx) => (
                         <tr
                           key={bet.id}
+                          data-bet-highlight={
+                            highlightDayKey === dayKey(betProfitDate(bet)) ? 'true' : undefined
+                          }
                           className={`border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors ${
                             groupBets.length > 1 && idx === 0 ? 'border-l-2 border-l-cyan-500' : ''
-                          } ${groupBets.length > 1 && idx > 0 ? 'border-l-2 border-l-cyan-500/50' : ''}`}
+                          } ${groupBets.length > 1 && idx > 0 ? 'border-l-2 border-l-cyan-500/50' : ''} ${
+                            highlightDayKey === dayKey(betProfitDate(bet)) ? 'bet-row-highlight' : ''
+                          }`}
                         >
                           <td className="py-3 md:py-4 px-3 md:px-4">
                             <div className="flex items-center gap-1 md:gap-2">
@@ -340,12 +414,13 @@ export function BetTracker() {
             </>
           )}
         </div>
+        )}
       </div>
 
       <AddBetModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchBets}
+        onSuccess={() => fetchBets({ silent: true })}
       />
     </div>
   );

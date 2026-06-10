@@ -16,5 +16,9 @@ export function gameHasSelectedMarketLines(
   marketType: MarketType,
   selectedBooks: Sportsbook[]
 ): boolean {
-  return selectedBooks.some((book) => bookHasCompleteMarketLine(game, marketType, book));
+  const market = game.odds[marketType];
+  if (!market) return false;
+  return selectedBooks.some(
+    (book) => market.home[book] !== undefined || market.away[book] !== undefined
+  );
 }

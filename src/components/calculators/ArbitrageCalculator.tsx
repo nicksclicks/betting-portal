@@ -3,7 +3,7 @@ import { Calculator, TrendingUp, DollarSign, Target } from 'lucide-react';
 import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { OddsInput } from '../shared/OddsInput';
 import { AddBetModal } from '../bets/AddBetModal';
-import { calculateArbitrage, formatCurrency, formatPercent } from '../../utils/odds';
+import { calculateHedge, calculateFromHedge, formatCurrency, formatPercent } from '../../utils/odds';
 import { Sportsbook } from '../../constants/sportsbooks';
 
 interface ArbitrageCalculatorProps {
@@ -18,7 +18,10 @@ interface ArbitrageCalculatorProps {
 }
 
 export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
-  const [totalStake, setTotalStake] = useState('1000');
+  const [source, setSource] = useState<{ side: 'A' | 'B'; amount: string }>({
+    side: 'A',
+    amount: '1000',
+  });
   const [teamA, setTeamA] = useState('');
   const [oddsA, setOddsA] = useState('');
   const [bookA, setBookA] = useState('');
@@ -39,27 +42,29 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
   }, [prefillData]);
 
   const result = useMemo(() => {
-    const stake = parseFloat(totalStake);
+    const amount = parseFloat(source.amount);
     const oA = parseFloat(oddsA);
     const oB = parseFloat(oddsB);
 
-    if (isNaN(stake) || isNaN(oA) || isNaN(oB) || stake <= 0) {
+    if (isNaN(amount) || isNaN(oA) || isNaN(oB) || amount <= 0) {
       return null;
     }
 
-    return calculateArbitrage(stake, oA, oB);
-  }, [totalStake, oddsA, oddsB]);
+    return source.side === 'A'
+      ? calculateHedge(amount, oA, oB)
+      : calculateFromHedge(amount, oA, oB);
+  }, [source, oddsA, oddsB]);
 
   const getProfitColor = () => {
     if (!result) return 'text-neutral-400';
-    if (result.profitPercent >= 0) return 'text-lime-400';
-    if (result.profitPercent >= -2) return 'text-lime-400';
-    if (result.profitPercent >= -4) return 'text-amber-400';
+    if (result.roi >= 0) return 'text-lime-400';
+    if (result.roi >= -2) return 'text-lime-400';
+    if (result.roi >= -4) return 'text-amber-400';
     return 'text-red-400';
   };
 
   const handleTryExample = () => {
-    setTotalStake('1000');
+    setSource({ side: 'A', amount: '1000' });
     setTeamA('Kansas City Chiefs');
     setOddsA('-145');
     setBookA('BetOnline');
@@ -69,7 +74,7 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
   };
 
   const handleClear = () => {
-    setTotalStake('1000');
+    setSource({ side: 'A', amount: '' });
     setTeamA('');
     setOddsA('');
     setBookA('');
@@ -127,17 +132,6 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
 
         <div className="card">
           <div className="space-y-4 md:space-y-6">
-            <div>
-              <label className="label">Total Stake</label>
-              <input
-                type="number"
-                value={totalStake}
-                onChange={(e) => setTotalStake(e.target.value)}
-                className="input-field font-mono text-base md:text-lg"
-                placeholder="1000"
-              />
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-3 md:space-y-4 p-4 md:p-5 bg-lime-500/5 border border-lime-500/20 rounded-xl">
                 <h3 className="font-medium text-lime-400 text-sm md:text-base">Side A</h3>
@@ -157,6 +151,16 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
                   onChange={setOddsA}
                   id="oddsA"
                 />
+                <div>
+                  <label className="label">Bet Amount</label>
+                  <input
+                    type="number"
+                    value={source.side === 'A' ? source.amount : result ? result.betA.toFixed(2) : ''}
+                    onChange={(e) => setSource({ side: 'A', amount: e.target.value })}
+                    className="input-field font-mono text-sm md:text-base"
+                    placeholder="1000"
+                  />
+                </div>
                 <SportsbookSelect
                   label="Sportsbook"
                   value={bookA}
@@ -183,6 +187,16 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
                   onChange={setOddsB}
                   id="oddsB"
                 />
+                <div>
+                  <label className="label">Bet Amount</label>
+                  <input
+                    type="number"
+                    value={source.side === 'B' ? source.amount : result ? result.betB.toFixed(2) : ''}
+                    onChange={(e) => setSource({ side: 'B', amount: e.target.value })}
+                    className="input-field font-mono text-sm md:text-base"
+                    placeholder="1075"
+                  />
+                </div>
                 <SportsbookSelect
                   label="Sportsbook"
                   value={bookB}
@@ -199,24 +213,20 @@ export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
             <h3 className="text-base md:text-lg font-semibold text-white mb-4 md:mb-6">Results</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <div className="p-3 md:p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-neutral-500 text-xs md:text-sm mb-1 truncate">{teamA || 'Side A Bet'}</p>
-                <p className="text-white text-lg md:text-xl font-semibold font-mono">{formatCurrency(result.betA)}</p>
+                <p className="text-neutral-500 text-xs md:text-sm mb-1">Total Stake</p>
+                <p className="text-white text-lg md:text-xl font-semibold font-mono">{formatCurrency(result.totalStake)}</p>
               </div>
               <div className="p-3 md:p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-neutral-500 text-xs md:text-sm mb-1 truncate">{teamB || 'Side B Bet'}</p>
-                <p className="text-white text-lg md:text-xl font-semibold font-mono">{formatCurrency(result.betB)}</p>
+                <p className="text-neutral-500 text-xs md:text-sm mb-1">Total Payout</p>
+                <p className="text-white text-lg md:text-xl font-semibold font-mono">{formatCurrency(result.totalPayout)}</p>
               </div>
               <div className="p-3 md:p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-neutral-500 text-xs md:text-sm mb-1">P/L</p>
-                <p className={`text-lg md:text-xl font-semibold font-mono ${getProfitColor()}`}>
-                  {formatCurrency(result.profit)}
-                </p>
+                <p className="text-neutral-500 text-xs md:text-sm mb-1">Win / Loss</p>
+                <p className={`text-lg md:text-xl font-semibold font-mono ${getProfitColor()}`}>{formatCurrency(result.winLoss)}</p>
               </div>
               <div className="p-3 md:p-4 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-neutral-500 text-xs md:text-sm mb-1">P/L %</p>
-                <p className={`text-lg md:text-xl font-semibold font-mono ${getProfitColor()}`}>
-                  {formatPercent(result.profitPercent)}
-                </p>
+                <p className="text-neutral-500 text-xs md:text-sm mb-1">ROI</p>
+                <p className={`text-lg md:text-xl font-semibold font-mono ${getProfitColor()}`}>{formatPercent(result.roi)}</p>
               </div>
             </div>
 

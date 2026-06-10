@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ALL_SPORTSBOOKS } from '../constants/sportsbooks';
+import { API_SPORTSBOOKS } from '../constants/sportsbooks';
 import type { Database } from '../types/database';
 
 type OddsRow = Database['public']['Tables']['odds']['Row'];
@@ -32,6 +32,46 @@ export interface OddsApiGame {
     string,
     Record<string, { home: number | null; away: number | null; spread?: number; total?: number }>
   >;
+}
+
+/** Include games that started recently (still in progress). */
+export const ODDS_GAME_LOOKBACK_MS = 6 * 60 * 60 * 1000;
+
+const ODDS_SELECT =
+  'sport, home_team, away_team, game_time, market_type, sportsbook, home_odds, away_odds, spread, total, external_id, updated_at';
+
+const SUPABASE_PAGE_SIZE = 1000;
+
+export function oddsGameKey(game: Pick<OddsApiGame, 'id' | 'homeTeam' | 'awayTeam'>): string {
+  return `${game.id}-${game.homeTeam}-${game.awayTeam}`;
+}
+
+/** Merge book-level odds; later games in `sources` win on conflicts. */
+export function mergeOddsApiGames(...sources: OddsApiGame[][]): OddsApiGame[] {
+  const map = new Map<string, OddsApiGame>();
+
+  for (const games of sources) {
+    for (const game of games) {
+      const key = oddsGameKey(game);
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, {
+          ...game,
+          odds: structuredClone(game.odds),
+        });
+        continue;
+      }
+
+      for (const [marketType, books] of Object.entries(game.odds)) {
+        if (!existing.odds[marketType]) {
+          existing.odds[marketType] = {};
+        }
+        Object.assign(existing.odds[marketType], books);
+      }
+    }
+  }
+
+  return Array.from(map.values());
 }
 
 export function oddsRowsToApiGames(rows: OddsSelectRow[]): OddsApiGame[] {
@@ -92,18 +132,34 @@ export function maxUpdatedAtFromRows(rows: OddsSelectRow[]): Date | null {
   return maxMs > 0 ? new Date(maxMs) : null;
 }
 
-export async function fetchOddsRows(supabase: SupabaseClient<Database>): Promise<OddsSelectRow[]> {
-  const { data, error } = await supabase
-    .from('odds')
-    .select(
-      'sport, home_team, away_team, game_time, market_type, sportsbook, home_odds, away_odds, spread, total, external_id, updated_at'
-    )
-    .gte('game_time', new Date().toISOString())
-    .in('sportsbook', [...ALL_SPORTSBOOKS])
-    .order('game_time', { ascending: true });
+export function oddsGameTimeCutoffIso(): string {
+  return new Date(Date.now() - ODDS_GAME_LOOKBACK_MS).toISOString();
+}
 
-  if (error) throw error;
-  return (data ?? []) as OddsSelectRow[];
+export async function fetchOddsRows(supabase: SupabaseClient<Database>): Promise<OddsSelectRow[]> {
+  const cutoff = oddsGameTimeCutoffIso();
+  const allRows: OddsSelectRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('odds')
+      .select(ODDS_SELECT)
+      .gte('game_time', cutoff)
+      .in('sportsbook', [...API_SPORTSBOOKS])
+      .order('game_time', { ascending: true })
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = (data ?? []) as OddsSelectRow[];
+    allRows.push(...batch);
+
+    if (batch.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return allRows;
 }
 
 const FETCH_ODDS_PATH = '/functions/v1/fetch-odds';

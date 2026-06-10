@@ -41,6 +41,20 @@
   }
 }
 
+@keyframes betHighlightPulse {
+  0%,
+  100% {
+    background-color: rgba(34, 211, 238, 0);
+  }
+  50% {
+    background-color: rgba(34, 211, 238, 0.18);
+  }
+}
+
+.bet-row-highlight {
+  animation: betHighlightPulse 1s ease-in-out 0s 2;
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;

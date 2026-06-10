@@ -1,22 +1,78 @@
-/** Offshore-style books available from The Odds API (us region). */
-export const OFFSHORE_SPORTSBOOKS = ['Bovada', 'BetOnline', 'MyBookie'] as const;
+/** Offshore books — manual tracking; live odds where noted in ODDS_API_BOOKMAKER_MAP. */
+export const OFFSHORE_SPORTSBOOKS = [
+  'Bet105',
+  'BetAnything',
+  'Betmania',
+  'BetNow',
+  'BetOnline',
+  'Betphoenix',
+  'BetUS',
+  'Betwhale',
+  'Bookmaker',
+  'Bovada',
+  'BTL',
+  'BUSR',
+  'Everygame',
+  'Heritage',
+  'JustBet',
+  'KBC Sportsbook',
+  'LuckRebel',
+  'MyBookie',
+  'PureWage',
+  'Skybook',
+  'Sportsbetting',
+  'Thunderpick',
+  'Wager Attack',
+  'XBet',
+  'YouWager',
+] as const;
 
-/** US books from The Odds API (us, us2, and us_ex regions). */
+/** US regulated, social, and exchange books. */
 export const US_SPORTSBOOKS = [
-  'NoVig',
-  'Fliff',
-  'FanDuel',
-  'DraftKings',
   'BetMGM',
-  'Caesars',
   'BetRivers',
+  'Caesars',
+  'DraftKings',
   'ESPN BET',
+  'FanDuel',
+  'Fliff',
+  'Novig',
+  'ProphetX',
   'Rebet',
 ] as const;
 
 export const ALL_SPORTSBOOKS = [...OFFSHORE_SPORTSBOOKS, ...US_SPORTSBOOKS] as const;
 
 export type Sportsbook = (typeof ALL_SPORTSBOOKS)[number];
+
+/**
+ * Odds API bookmaker keys → display names. Keep in sync with supabase/functions/fetch-odds.
+ * Books not listed here are tracked manually (deposits/bets) without live odds sync.
+ */
+export const ODDS_API_BOOKMAKER_MAP: Record<string, Sportsbook> = {
+  betonlineag: 'BetOnline',
+  bovada: 'Bovada',
+  mybookieag: 'MyBookie',
+  betus: 'BetUS',
+  everygame: 'Everygame',
+  betanysports: 'BetAnything',
+  fanduel: 'FanDuel',
+  draftkings: 'DraftKings',
+  betmgm: 'BetMGM',
+  caesars: 'Caesars',
+  betrivers: 'BetRivers',
+  williamhill_us: 'Caesars',
+  barstool: 'ESPN BET',
+  espnbet: 'ESPN BET',
+  fliff: 'Fliff',
+  rebet: 'Rebet',
+  novig: 'Novig',
+  prophetx: 'ProphetX',
+};
+
+export const API_SPORTSBOOKS = [
+  ...new Set(Object.values(ODDS_API_BOOKMAKER_MAP)),
+] as Sportsbook[];
 
 export const SPORTS = [
   'Football',

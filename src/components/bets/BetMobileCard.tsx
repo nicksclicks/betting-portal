@@ -12,6 +12,7 @@ interface BetMobileCardProps {
   onMarkWon: (id: string) => void;
   onMarkLost: (id: string) => void;
   onDelete: (id: string) => void;
+  highlighted?: boolean;
 }
 
 export function BetMobileCard({
@@ -24,6 +25,7 @@ export function BetMobileCard({
   onMarkWon,
   onMarkLost,
   onDelete,
+  highlighted = false,
 }: BetMobileCardProps) {
   const groupAccent =
     isGrouped && isFirstInGroup
@@ -33,7 +35,12 @@ export function BetMobileCard({
         : '';
 
   return (
-    <article className={`pl-4 pr-4 py-4 bg-neutral-950 border-b border-neutral-800 last:border-b-0 ${groupAccent}`}>
+    <article
+      data-bet-highlight={highlighted ? 'true' : undefined}
+      className={`pl-4 pr-4 py-4 bg-neutral-950 border-b border-neutral-800 last:border-b-0 ${groupAccent} ${
+        highlighted ? 'bet-row-highlight' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
