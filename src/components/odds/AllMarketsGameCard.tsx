@@ -4,7 +4,7 @@ import {
   MARKET_TYPE_SHORT_LABELS,
   Sportsbook,
 } from '../../constants/sportsbooks';
-import { GameOdds } from '../../data/mockOdds';
+import { GameOdds } from '../../types/odds';
 import { formatOdds, formatPercent } from '../../utils/odds';
 import { BestPercentResult, getBestPercentColorClass } from '../../utils/bestPercent';
 import {

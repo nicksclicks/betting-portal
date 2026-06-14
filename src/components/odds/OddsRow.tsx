@@ -1,4 +1,4 @@
-import { GameOdds } from '../../data/mockOdds';
+import { GameOdds } from '../../types/odds';
 import { MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { formatOdds, formatPercent } from '../../utils/odds';
 import { BestPercentResult, getBestPercentColorClass } from '../../utils/bestPercent';

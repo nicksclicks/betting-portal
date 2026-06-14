@@ -1,5 +1,5 @@
 import { MarketType, Sportsbook } from '../../constants/sportsbooks';
-import { GameOdds } from '../../data/mockOdds';
+import { GameOdds } from '../../types/odds';
 import { formatOdds } from '../../utils/odds';
 import { BestPercentResult } from '../../utils/bestPercent';
 import {

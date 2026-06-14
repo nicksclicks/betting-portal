@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { GameOdds } from '../../data/mockOdds';
+import { GameOdds } from '../../types/odds';
 import { MarketType, Sportsbook } from '../../constants/sportsbooks';
 import { BestPercentResult } from '../../utils/bestPercent';
 

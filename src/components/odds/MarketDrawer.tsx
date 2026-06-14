@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { MarketType, Sportsbook } from '../../constants/sportsbooks';
-import { GameOdds } from '../../data/mockOdds';
+import { GameOdds } from '../../types/odds';
 import { formatPercent } from '../../utils/odds';
 import { BestPercentResult, getBestPercentColorClass } from '../../utils/bestPercent';
 import {

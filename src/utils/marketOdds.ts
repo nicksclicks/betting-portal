@@ -1,4 +1,4 @@
-import { GameOdds } from '../data/mockOdds';
+import { GameOdds } from '../types/odds';
 import { MarketType, Sportsbook } from '../constants/sportsbooks';
 
 export function bookHasCompleteMarketLine(

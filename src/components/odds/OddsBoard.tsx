@@ -10,7 +10,7 @@ import {
   MarketType,
   Sportsbook,
 } from '../../constants/sportsbooks';
-import { GameOdds, getMockOddsApiPayload } from '../../data/mockOdds';
+import type { GameOdds } from '../../types/odds';
 import {
   fetchOddsRows,
   mergeOddsApiGames,
@@ -26,7 +26,7 @@ import {
   readCachedGames,
   writeCachedGames,
 } from '../../lib/oddsCache';
-import { isLocalMockMode, supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { OddsGameCard } from './OddsGameCard';
 import { OddsRow } from './OddsRow';
 import { AllMarketsGameCard } from './AllMarketsGameCard';
@@ -36,10 +36,30 @@ import { calculateGameBestPercent, type BestPercentResult } from '../../utils/be
 import { gameHasSelectedMarketLines } from '../../utils/marketOdds';
 import { emptyGameSidePick, type GameSidePick } from './useOddsGameInteraction';
 import { SyncedHorizontalScroll } from '../shared/SyncedHorizontalScroll';
+import {
+  ODDS_DEBUG,
+  buildOddsDebugInfo,
+  type OddsDebugInfo,
+  type OddsFilterStage,
+} from '../../lib/oddsDebug';
+import { OddsDebugPanel } from './OddsDebugPanel';
 
 /** 'All' switches the board to the all-markets summary view. */
 type MarketFilterValue = MarketType | 'All';
 type OddsSortKey = 'time' | 'bestPercent' | MarketType;
+
+/** Date window for narrowing the board to games starting within a given range. */
+type DateFilter = 'all' | 'today' | '24h' | '7d' | 'custom';
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'today', label: 'Today' },
+  { value: '24h', label: 'Next 24 hours' },
+  { value: '7d', label: 'Next 7 days' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Picks in the all-markets drill-ins are tracked per game *and* market. */
 function marketPickKey(gameId: string, market: MarketType): string {
@@ -104,9 +124,20 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [selectedBooks, setSelectedBooks] = useState<Sportsbook[]>(() =>
     readSessionFilter<Sportsbook[]>('selectedBooks', [...API_SPORTSBOOKS])
   );
-  const [maxFavorite, setMaxFavorite] = useState(() => readSessionFilter('maxFavorite', -300));
-  const [maxUnderdog, setMaxUnderdog] = useState(() => readSessionFilter('maxUnderdog', 300));
-  const [maxLossPercent, setMaxLossPercent] = useState(() => readSessionFilter('maxLossPercent', 4));
+  // Odds-quality filter defaults. 0 in any of these means "no limit" (see passesOddsFilters).
+  const DEFAULT_MAX_FAVORITE = 0;
+  const DEFAULT_MAX_UNDERDOG = 0;
+  const DEFAULT_MAX_LOSS_PERCENT = 0;
+  const [maxFavorite, setMaxFavorite] = useState(() => readSessionFilter('maxFavorite', DEFAULT_MAX_FAVORITE));
+  const [maxUnderdog, setMaxUnderdog] = useState(() => readSessionFilter('maxUnderdog', DEFAULT_MAX_UNDERDOG));
+  const [maxLossPercent, setMaxLossPercent] = useState(() => readSessionFilter('maxLossPercent', DEFAULT_MAX_LOSS_PERCENT));
+  // Display-only: drop sportsbook columns that have no odds for any visible game.
+  const [hideEmptyBooks, setHideEmptyBooks] = useState(() => readSessionFilter('hideEmptyBooks', false));
+  const [dateFilter, setDateFilter] = useState<DateFilter>(() =>
+    readSessionFilter<DateFilter>('dateFilter', 'all')
+  );
+  const [customStart, setCustomStart] = useState(() => readSessionFilter('customStart', ''));
+  const [customEnd, setCustomEnd] = useState(() => readSessionFilter('customEnd', ''));
   const [games, setGames] = useState<GameOdds[]>(() => readCachedGames() ?? []);
   // Only show the spinner when we have nothing cached to show.
   const [loading, setLoading] = useState(() => readCachedGames() === null);
@@ -120,6 +151,8 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [openSheet, setOpenSheet] = useState<{ gameId: string; market: MarketType } | null>(null);
   const [syncedFilterKey, setSyncedFilterKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // Analysis-only: snapshot of the most recent odds load (see lib/oddsDebug.ts).
+  const [debugInfo, setDebugInfo] = useState<OddsDebugInfo | null>(null);
   const filterKeyRef = useRef('');
 
   // Tick every 30s so games drop off the list as soon as their start time passes.
@@ -137,8 +170,21 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
         maxFavorite,
         maxUnderdog,
         maxLossPercent,
+        dateFilter,
+        customStart,
+        customEnd,
       }),
-    [selectedSports, marketFilter, selectedBooks, maxFavorite, maxUnderdog, maxLossPercent]
+    [
+      selectedSports,
+      marketFilter,
+      selectedBooks,
+      maxFavorite,
+      maxUnderdog,
+      maxLossPercent,
+      dateFilter,
+      customStart,
+      customEnd,
+    ]
   );
   filterKeyRef.current = currentFilterKey;
 
@@ -150,7 +196,22 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     writeSessionFilter('maxFavorite', maxFavorite);
     writeSessionFilter('maxUnderdog', maxUnderdog);
     writeSessionFilter('maxLossPercent', maxLossPercent);
-  }, [selectedSports, marketFilter, selectedBooks, maxFavorite, maxUnderdog, maxLossPercent]);
+    writeSessionFilter('hideEmptyBooks', hideEmptyBooks);
+    writeSessionFilter('dateFilter', dateFilter);
+    writeSessionFilter('customStart', customStart);
+    writeSessionFilter('customEnd', customEnd);
+  }, [
+    selectedSports,
+    marketFilter,
+    selectedBooks,
+    maxFavorite,
+    maxUnderdog,
+    maxLossPercent,
+    hideEmptyBooks,
+    dateFilter,
+    customStart,
+    customEnd,
+  ]);
 
   const filtersDirty = syncedFilterKey !== null && currentFilterKey !== syncedFilterKey;
 
@@ -186,55 +247,84 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
         writeCachedGames(next);
       };
 
+      // Debug accumulator — written once in `finally` so every exit (success,
+      // fallback, failure, abort, rate-limited) records exactly one snapshot.
+      const dbg: Omit<OddsDebugInfo, 'loadedAt'> = {
+        status: 'aborted',
+        source: null,
+        forceLiveSync,
+        dbOnly,
+        silent,
+        edgeInvoked: false,
+        error: null,
+        apiGames: null,
+        dbGames: null,
+        appliedGames: [],
+      };
+
       if (!silent) setLoading(true);
       let loadSucceeded = false;
       try {
-        if (isLocalMockMode) {
-          const data = getMockOddsApiPayload();
-          if (gone()) return;
-          applyGames(transformApiGames(data.games as OddsApiGame[]));
-          setLastLiveSync(new Date(data.updated));
-          loadSucceeded = true;
-          return;
-        }
-
         const loadFromDatabase = async () => {
           const rows = await fetchOddsRows(supabase);
           if (gone()) return null;
           return oddsRowsToApiGames(rows);
         };
 
-        if (!dbOnly && (forceLiveSync || canInvokeOddsEdgeSync())) {
+        const limiterAllows = canInvokeOddsEdgeSync();
+        const shouldInvokeEdge = !dbOnly && (forceLiveSync || limiterAllows);
+
+        if (shouldInvokeEdge) {
           try {
+            dbg.edgeInvoked = true;
             const { games: apiGames, updated } = await refreshOddsViaEdgeFunction();
+            dbg.apiGames = apiGames;
             if (gone()) return;
             const syncTime = new Date(updated);
             writeLastOddsEdgeSync(syncTime);
             setLastLiveSync(syncTime);
             const dbGames = await loadFromDatabase();
             if (gone() || dbGames === null) return;
-            applyGames(transformApiGames(mergeOddsApiGames(apiGames, dbGames)));
+            dbg.dbGames = dbGames;
+            const merged = mergeOddsApiGames(apiGames, dbGames);
+            applyGames(transformApiGames(merged));
+            dbg.source = 'api+db-merge';
+            dbg.appliedGames = merged;
+            dbg.status = 'success';
             loadSucceeded = true;
           } catch (error) {
             console.error('Error refreshing odds:', error);
+            dbg.error = error instanceof Error ? error.message : String(error);
             const dbGames = await loadFromDatabase();
             if (gone() || dbGames === null) return;
+            dbg.dbGames = dbGames;
             applyGames(transformApiGames(dbGames));
+            dbg.source = 'db-fallback';
+            dbg.appliedGames = dbGames;
+            dbg.status = 'success';
             loadSucceeded = true;
           }
         } else {
           const dbGames = await loadFromDatabase();
           if (gone() || dbGames === null) return;
+          dbg.dbGames = dbGames;
           applyGames(transformApiGames(dbGames));
+          dbg.source = 'db-only';
+          dbg.appliedGames = dbGames;
+          // Foreground load that wanted fresh odds but the limiter skipped the live API.
+          dbg.status = !dbOnly && !forceLiveSync && !limiterAllows ? 'rate-limited' : 'success';
           loadSucceeded = true;
         }
       } catch (error) {
         console.error('Error loading odds from database:', error);
+        dbg.error = error instanceof Error ? error.message : String(error);
+        dbg.status = 'failed';
       } finally {
         if (!gone() && loadSucceeded) {
           setSyncedFilterKey(filterKeyRef.current);
         }
         setLoading(false);
+        if (ODDS_DEBUG) setDebugInfo(buildOddsDebugInfo(dbg));
       }
     },
     []
@@ -263,20 +353,97 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     }));
   }, [games, selectedBooks]);
 
-  const filteredGames = useMemo(() => {
+  // Upper/lower bounds (ms epoch) for the selected date filter; null means no date limit.
+  const dateWindow = useMemo<{ start: number; end: number } | null>(() => {
+    switch (dateFilter) {
+      case '24h':
+        return { start: now, end: now + DAY_MS };
+      case '7d':
+        return { start: now, end: now + 7 * DAY_MS };
+      case 'today': {
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        return { start: now, end: end.getTime() };
+      }
+      case 'custom': {
+        if (!customStart && !customEnd) return null;
+        const start = customStart ? new Date(`${customStart}T00:00:00`).getTime() : now;
+        const end = customEnd ? new Date(`${customEnd}T23:59:59.999`).getTime() : Infinity;
+        return { start, end };
+      }
+      default:
+        return null;
+    }
+  }, [dateFilter, now, customStart, customEnd]);
+
+  const { list: filteredGames, funnel: filterFunnel } = useMemo(() => {
     let filtered = gamesWithMarketBests;
 
-    // Drop games whose start time has already passed.
-    filtered = filtered.filter((g) => g.game.gameTime.getTime() > now);
+    // Record each filter stage so the debug panel can show where games were dropped.
+    const funnel: OddsFilterStage[] = [
+      { label: 'Loaded', remaining: filtered.length, dropped: 0 },
+    ];
+    let prevCount = filtered.length;
+    const step = (label: string, next: typeof filtered) => {
+      funnel.push({ label, remaining: next.length, dropped: prevCount - next.length });
+      prevCount = next.length;
+      return next;
+    };
 
-    if (selectedSports.length > 0) {
-      filtered = filtered.filter((g) => selectedSports.includes(g.game.sport));
+    // Drop games whose start time has already passed.
+    filtered = step('Start time', filtered.filter((g) => g.game.gameTime.getTime() > now));
+
+    if (dateWindow) {
+      filtered = step(
+        'Date window',
+        filtered.filter((g) => {
+          const t = g.game.gameTime.getTime();
+          return t >= dateWindow.start && t <= dateWindow.end;
+        })
+      );
     }
 
-    filtered = filtered.filter((g) =>
-      marketFilter === 'All'
-        ? MARKET_TYPES.some((market) => gameHasSelectedMarketLines(g.game, market, selectedBooks))
-        : gameHasSelectedMarketLines(g.game, marketFilter, selectedBooks)
+    if (selectedSports.length > 0) {
+      filtered = step('Sport', filtered.filter((g) => selectedSports.includes(g.game.sport)));
+    }
+
+    filtered = step(
+      'Market lines',
+      filtered.filter((g) =>
+        marketFilter === 'All'
+          ? MARKET_TYPES.some((market) => gameHasSelectedMarketLines(g.game, market, selectedBooks))
+          : gameHasSelectedMarketLines(g.game, marketFilter, selectedBooks)
+      )
+    );
+
+    // Odds-quality filters: every displayed best line must sit between Max Favorite and
+    // Max Underdog, and the best % (hold) must not be worse than Max Loss %. A value of 0 in
+    // any field disables that bound ("no limit") — 0 is never a meaningful odds/hold limit.
+    // Games with no complete two-sided line can't be judged, so they pass through untouched.
+    const passesOddsFilters = (best: BestPercentResult | null): boolean => {
+      if (!best) return true;
+      const inPriceRange = (odds: number) =>
+        (maxFavorite === 0 || odds >= maxFavorite) &&
+        (maxUnderdog === 0 || odds <= maxUnderdog);
+      return (
+        inPriceRange(best.homeOdds) &&
+        inPriceRange(best.awayOdds) &&
+        (maxLossPercent === 0 || best.percent >= -maxLossPercent)
+      );
+    };
+
+    filtered = step(
+      'Max fav/dog/loss',
+      filtered.filter((g) => {
+        if (marketFilter === 'All') {
+          // Keep the game if any market with a complete line meets the criteria.
+          const results = MARKET_TYPES.map((market) => g.marketBests[market]).filter(
+            (best): best is BestPercentResult => best !== null
+          );
+          return results.length === 0 || results.some(passesOddsFilters);
+        }
+        return passesOddsFilters(g.marketBests[marketFilter]);
+      })
     );
 
     // 'bestPercent' sorts the single-market view; market-type keys sort the all-markets view.
@@ -289,7 +456,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
           ? sortKey
           : null;
 
-    filtered = [...filtered].sort((a, b) => {
+    const list = [...filtered].sort((a, b) => {
       const cmp = percentMarket
         ? (a.marketBests[percentMarket]?.percent ?? -Infinity) -
           (b.marketBests[percentMarket]?.percent ?? -Infinity)
@@ -297,8 +464,20 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
 
-    return filtered;
-  }, [gamesWithMarketBests, selectedSports, marketFilter, sortKey, sortDir, selectedBooks, now]);
+    return { list, funnel };
+  }, [
+    gamesWithMarketBests,
+    selectedSports,
+    marketFilter,
+    sortKey,
+    sortDir,
+    selectedBooks,
+    now,
+    dateWindow,
+    maxFavorite,
+    maxUnderdog,
+    maxLossPercent,
+  ]);
 
   // Hide market columns with no data anywhere (e.g. First Half until the API syncs it).
   const visibleMarkets = useMemo(
@@ -306,12 +485,36 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     [filteredGames]
   );
 
+  // In single-market view, order book columns so books with the most populated lines (across the
+  // visible games) sit leftmost; sparse/empty books fall to the right. Recomputed whenever the data
+  // refreshes or filters change. Order is irrelevant in the All-markets view (columns are markets,
+  // not books), so selectedBooks is left untouched there.
+  const orderedBooks = useMemo(() => {
+    if (marketFilter === 'All') return selectedBooks;
+    const populatedCount = (book: Sportsbook) =>
+      filteredGames.reduce((total, { game }) => {
+        const market = game.odds[marketFilter];
+        if (!market) return total;
+        return (
+          total +
+          (market.home[book] !== undefined ? 1 : 0) +
+          (market.away[book] !== undefined ? 1 : 0)
+        );
+      }, 0);
+    const ranked = selectedBooks
+      .map((book, index) => ({ book, index, count: populatedCount(book) }))
+      .sort((a, b) => b.count - a.count || a.index - b.index);
+    return (hideEmptyBooks ? ranked.filter((entry) => entry.count > 0) : ranked).map(
+      (entry) => entry.book
+    );
+  }, [marketFilter, selectedBooks, filteredGames, hideEmptyBooks]);
+
   const tableMinWidth = useMemo(() => {
     if (marketFilter === 'All') {
       return 380 + visibleMarkets.length * 140;
     }
-    return 520 + selectedBooks.length * 80;
-  }, [marketFilter, visibleMarkets.length, selectedBooks.length]);
+    return 520 + orderedBooks.length * 80;
+  }, [marketFilter, visibleMarkets.length, orderedBooks.length]);
 
   // Clicking the active column flips direction; clicking a new column resets to its default.
   const handleSort = (key: OddsSortKey) => {
@@ -520,6 +723,50 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
               </div>
             </div>
 
+            <div className="mb-6">
+              <label className="label">Date</label>
+              <div className="flex flex-wrap gap-2">
+                {DATE_FILTER_OPTIONS.map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => setDateFilter(option.value)}
+                    className={`touch-manipulation inline-flex items-center justify-center min-h-[44px] px-3 py-2.5 rounded-full text-xs font-medium transition-colors border ${
+                      dateFilter === option.value
+                        ? 'bg-lime-500/10 border-lime-500/30 text-lime-400 active:opacity-90'
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-500 hover:border-neutral-700 active:bg-neutral-800 active:border-neutral-600'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {dateFilter === 'custom' && (
+                <div className="grid grid-cols-2 gap-3 md:gap-4 mt-3 max-w-md">
+                  <div>
+                    <label className="label">From</label>
+                    <input
+                      type="date"
+                      value={customStart}
+                      max={customEnd || undefined}
+                      onChange={(e) => setCustomStart(e.target.value)}
+                      className="input-field text-sm md:text-base"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">To</label>
+                    <input
+                      type="date"
+                      value={customEnd}
+                      min={customStart || undefined}
+                      onChange={(e) => setCustomEnd(e.target.value)}
+                      className="input-field text-sm md:text-base"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <div>
                 <label className="label">Market Type</label>
@@ -569,6 +816,33 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                   step="0.5"
                 />
               </div>
+            </div>
+
+            <label className="mt-4 flex items-center gap-2 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={hideEmptyBooks}
+                onChange={(e) => setHideEmptyBooks(e.target.checked)}
+                className="h-4 w-4 rounded border-neutral-700 bg-neutral-900 accent-lime-500 focus:ring-1 focus:ring-lime-500/40"
+              />
+              <span className="text-xs md:text-sm text-neutral-400">
+                Hide sportsbook columns with no odds
+              </span>
+            </label>
+
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-neutral-600">Set a field to 0 to disable that limit.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMaxFavorite(DEFAULT_MAX_FAVORITE);
+                  setMaxUnderdog(DEFAULT_MAX_UNDERDOG);
+                  setMaxLossPercent(DEFAULT_MAX_LOSS_PERCENT);
+                }}
+                className="text-xs text-neutral-500 hover:text-lime-400 transition-colors"
+              >
+                Reset to defaults
+              </button>
             </div>
           </div>
         )}
@@ -620,7 +894,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                       key={game.id}
                       game={game}
                       marketType={marketFilter}
-                      selectedBooks={selectedBooks}
+                      selectedBooks={orderedBooks}
                       bestPercent={marketBests[marketFilter]}
                       onOddsClick={onOddsClick}
                       pick={getGamePick(game.id)}
@@ -683,7 +957,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                               {sortIcon('bestPercent')}
                             </button>
                           </th>
-                          {selectedBooks.map((book) => (
+                          {orderedBooks.map((book) => (
                             <th
                               key={book}
                               className="text-center py-3 md:py-4 px-1 md:px-2 text-xs md:text-sm font-medium text-neutral-500 min-w-[60px] md:min-w-[80px]"
@@ -720,7 +994,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                           key={game.id}
                           game={game}
                           marketType={marketFilter}
-                          selectedBooks={selectedBooks}
+                          selectedBooks={orderedBooks}
                           bestPercent={marketBests[marketFilter]}
                           onOddsClick={onOddsClick}
                           pick={getGamePick(game.id)}
@@ -734,6 +1008,10 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             </>
           )}
         </div>
+
+        {ODDS_DEBUG && debugInfo && (
+          <OddsDebugPanel info={debugInfo} funnel={filterFunnel} renderedCount={filteredGames.length} />
+        )}
       </div>
 
       {openSheet &&

@@ -1,4 +1,4 @@
-import type { GameOdds } from '../data/mockOdds';
+import type { GameOdds } from '../types/odds';
 
 /**
  * Caches the loaded odds for the life of the browser tab so navigating back to

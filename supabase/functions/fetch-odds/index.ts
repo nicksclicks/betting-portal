@@ -15,13 +15,13 @@ const BOOKMAKER_BATCH_SIZE = 8;
 const SUPABASE_PAGE_SIZE = 1000;
 const ODDS_GAME_LOOKBACK_MS = 6 * 60 * 60 * 1000;
 
-const SPORT_KEYS: Record<string, string> = {
-  "Football": "americanfootball_nfl",
-  "Basketball": "basketball_nba",
-  "Baseball": "baseball_mlb",
-  "Hockey": "icehockey_nhl",
-  "Soccer": "soccer_usa_mls",
-  "Tennis": "tennis_atp_aus_open",
+const SPORT_KEYS: Record<string, string[]> = {
+  "Football": ["americanfootball_nfl"],
+  "Basketball": ["basketball_nba"],
+  "Baseball": ["baseball_mlb"],
+  "Hockey": ["icehockey_nhl"],
+  "Soccer": ["soccer_usa_mls", "soccer_fifa_world_cup"],
+  "Tennis": ["tennis_atp_aus_open"],
 };
 
 /** Maps Odds API bookmaker keys to display names — sync with src/constants/sportsbooks.ts */
@@ -172,7 +172,7 @@ async function fetchOddsBatch(sportKey: string, bookmakerKeys: string[]): Promis
   return await response.json();
 }
 
-async function fetchOddsForSport(sportKey: string, sport: string): Promise<OddsApiEvent[]> {
+async function fetchOddsForSport(sportKeys: string[], sport: string): Promise<OddsApiEvent[]> {
   if (!ODDS_API_KEY) {
     return [];
   }
@@ -180,9 +180,11 @@ async function fetchOddsForSport(sportKey: string, sport: string): Promise<OddsA
   const merged = new Map<string, OddsApiEvent>();
 
   try {
-    for (const batch of chunk(BOOKMAKER_KEYS, BOOKMAKER_BATCH_SIZE)) {
-      const events = await fetchOddsBatch(sportKey, batch);
-      mergeEvents(merged, events);
+    for (const sportKey of sportKeys) {
+      for (const batch of chunk(BOOKMAKER_KEYS, BOOKMAKER_BATCH_SIZE)) {
+        const events = await fetchOddsBatch(sportKey, batch);
+        mergeEvents(merged, events);
+      }
     }
   } catch (error) {
     console.error(`Error fetching odds for ${sport}:`, error);
@@ -234,8 +236,8 @@ Deno.serve(async (req: Request) => {
 
     const allOddsData: { sport: string; events: OddsApiEvent[] }[] = [];
 
-    for (const [sport, sportKey] of Object.entries(SPORT_KEYS)) {
-      const events = await fetchOddsForSport(sportKey, sport);
+    for (const [sport, sportKeys] of Object.entries(SPORT_KEYS)) {
+      const events = await fetchOddsForSport(sportKeys, sport);
       if (events.length > 0) {
         allOddsData.push({ sport, events });
       }

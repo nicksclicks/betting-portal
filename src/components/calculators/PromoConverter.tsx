@@ -4,9 +4,8 @@ import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { OddsInput } from '../shared/OddsInput';
 import { calculatePromoConversion, formatCurrency, formatOdds } from '../../utils/odds';
 import { ALL_SPORTSBOOKS, Sportsbook } from '../../constants/sportsbooks';
-import { getMockOddsApiPayload } from '../../data/mockOdds';
 import { fetchOddsRows, oddsRowsToApiGames } from '../../lib/oddsFromSupabase';
-import { isLocalMockMode, supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 interface PromoOpportunity {
   gameId: string;
@@ -84,14 +83,8 @@ export function PromoConverter() {
     setOpportunities([]);
 
     try {
-      let games: ApiGame[];
-
-      if (isLocalMockMode) {
-        games = getMockOddsApiPayload().games as ApiGame[];
-      } else {
-        const rows = await fetchOddsRows(supabase);
-        games = oddsRowsToApiGames(rows) as ApiGame[];
-      }
+      const rows = await fetchOddsRows(supabase);
+      const games = oddsRowsToApiGames(rows) as ApiGame[];
       const amount = parseFloat(scanAmount);
       const results: PromoOpportunity[] = [];
 

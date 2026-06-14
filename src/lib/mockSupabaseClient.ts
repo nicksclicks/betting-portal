@@ -6,23 +6,30 @@ function resolved<T>(data: T, error: null = null) {
 }
 
 /**
+ * Chainable query stub: every filter/order/pagination method returns the same
+ * builder, and the builder itself is awaitable (resolves to an empty result set).
+ * Covers any combination of .eq/.gte/.in/.order/.range/… used across the app.
+ */
+function emptyQuery() {
+  const result = { data: [] as unknown[], error: null };
+  const builder: Record<string, unknown> = {
+    single: () => resolved<null>(null),
+    maybeSingle: () => resolved<null>(null),
+    then: (onFulfilled: (value: typeof result) => unknown) => onFulfilled(result),
+  };
+  for (const method of ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'is', 'like', 'ilike', 'order', 'range', 'limit', 'filter']) {
+    builder[method] = () => builder;
+  }
+  return builder;
+}
+
+/**
  * Minimal stub so Bet Tracker, Deposits, Settings load without a real Supabase project.
  * All reads return empty; writes no-op with success.
  */
 export function createMockSupabaseClient(): SupabaseClient<Database> {
-  const selectChain = {
-    eq: () => ({
-      order: () => resolved<unknown[]>([]),
-      single: () => resolved<null>(null),
-      maybeSingle: () => resolved<null>(null),
-    }),
-    order: () => resolved<unknown[]>([]),
-    single: () => resolved<null>(null),
-    maybeSingle: () => resolved<null>(null),
-  };
-
   const mockFrom = () => ({
-    select: () => selectChain,
+    select: () => emptyQuery(),
     insert: () => resolved<null>(null),
     update: () => ({
       eq: () => resolved<null>(null),
