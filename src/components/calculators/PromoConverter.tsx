@@ -1,11 +1,13 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Gift, ArrowRightLeft, Percent, Search, Loader2 } from 'lucide-react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Gift, ArrowRightLeft, Percent, Search, Loader2, Target } from 'lucide-react';
 import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { OddsInput } from '../shared/OddsInput';
+import { AddBetModal } from '../bets/AddBetModal';
 import { calculatePromoConversion, formatCurrency, formatOdds } from '../../utils/odds';
 import { ALL_SPORTSBOOKS, Sportsbook } from '../../constants/sportsbooks';
 import { fetchOddsRows, oddsRowsToApiGames } from '../../lib/oddsFromSupabase';
 import { supabase } from '../../lib/supabase';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface PromoOpportunity {
   gameId: string;
@@ -29,17 +31,61 @@ interface ApiGame {
   odds: Record<string, Record<string, { home: number | null; away: number | null }>>;
 }
 
-export function PromoConverter() {
-  const [freePlayAmount, setFreePlayAmount] = useState('');
-  const [freePlayOdds, setFreePlayOdds] = useState('');
-  const [freePlayBook, setFreePlayBook] = useState('');
-  const [hedgeOdds, setHedgeOdds] = useState('');
-  const [hedgeBook, setHedgeBook] = useState('');
+interface PromoConverterProps {
+  prefillData?: {
+    id: number;
+    teamA: string;
+    teamB: string;
+    oddsA: number;
+    oddsB: number;
+    bookA: Sportsbook;
+    bookB: Sportsbook;
+  } | null;
+}
 
-  const [scanSportsbook, setScanSportsbook] = useState<string>('');
-  const [scanAmount, setScanAmount] = useState('');
+export function PromoConverter({ prefillData }: PromoConverterProps) {
+  const [freePlayAmount, setFreePlayAmount] = usePersistentState('promo:freePlayAmount', '');
+  const [freePlayOdds, setFreePlayOdds] = usePersistentState('promo:freePlayOdds', '');
+  const [freePlayBook, setFreePlayBook] = usePersistentState('promo:freePlayBook', '');
+  const [hedgeOdds, setHedgeOdds] = usePersistentState('promo:hedgeOdds', '');
+  const [hedgeBook, setHedgeBook] = usePersistentState('promo:hedgeBook', '');
+
+  const [scanSportsbook, setScanSportsbook] = usePersistentState<string>('promo:scanSportsbook', '');
+  const [scanAmount, setScanAmount] = usePersistentState('promo:scanAmount', '');
   const [scanning, setScanning] = useState(false);
   const [opportunities, setOpportunities] = useState<PromoOpportunity[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [appliedPrefillId, setAppliedPrefillId] = usePersistentState<number | null>(
+    'promo:appliedPrefillId',
+    null,
+  );
+
+  useEffect(() => {
+    if (!prefillData || prefillData.id === appliedPrefillId) return;
+    // A promo conversion uses the underdog (more positive odds) as the free
+    // play and the favorite as the hedge, so map the pick's two sides that way.
+    const aIsUnderdog = prefillData.oddsA >= prefillData.oddsB;
+    const underdog = aIsUnderdog
+      ? { odds: prefillData.oddsA, book: prefillData.bookA }
+      : { odds: prefillData.oddsB, book: prefillData.bookB };
+    const favorite = aIsUnderdog
+      ? { odds: prefillData.oddsB, book: prefillData.bookB }
+      : { odds: prefillData.oddsA, book: prefillData.bookA };
+
+    setFreePlayOdds(formatOdds(underdog.odds));
+    setFreePlayBook(underdog.book);
+    setHedgeOdds(formatOdds(favorite.odds));
+    setHedgeBook(favorite.book);
+    setAppliedPrefillId(prefillData.id);
+  }, [
+    prefillData,
+    appliedPrefillId,
+    setAppliedPrefillId,
+    setFreePlayOdds,
+    setFreePlayBook,
+    setHedgeOdds,
+    setHedgeBook,
+  ]);
 
   const result = useMemo(() => {
     const amount = parseFloat(freePlayAmount);
@@ -405,6 +451,14 @@ export function PromoConverter() {
                 </div>
               </div>
             </div>
+
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="mt-4 md:mt-6 w-full flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors text-sm md:text-base"
+            >
+              <Target className="w-4 h-4 md:w-5 md:h-5" />
+              Add to Tracker
+            </button>
           </div>
         )}
       </div>
@@ -431,6 +485,29 @@ export function PromoConverter() {
           </ul>
         </div>
       </div>
+
+      <AddBetModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialBets={
+          result && freePlayBook && hedgeBook
+            ? [
+                {
+                  betName: '',
+                  sportsbook: freePlayBook,
+                  odds: freePlayOdds,
+                  amountStaked: freePlayAmount,
+                },
+                {
+                  betName: '',
+                  sportsbook: hedgeBook,
+                  odds: hedgeOdds,
+                  amountStaked: result.hedgeBet.toFixed(2),
+                },
+              ]
+            : undefined
+        }
+      />
     </div>
   );
 }

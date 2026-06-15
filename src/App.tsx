@@ -18,6 +18,9 @@ import { LegalDisclaimer } from './components/legal/LegalDisclaimer';
 import { Sportsbook } from './constants/sportsbooks';
 
 interface CalculatorPrefill {
+  // Unique per selection so each calculator applies a given pick exactly once
+  // and never clobbers edits the user makes afterwards.
+  id: number;
   teamA: string;
   teamB: string;
   oddsA: number;
@@ -88,8 +91,8 @@ function BettingPortalShell({ pathname, navigate }: BettingPortalShellProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const handleOddsClick = (data: CalculatorPrefill) => {
-    setCalculatorPrefill(data);
+  const handleOddsClick = (data: Omit<CalculatorPrefill, 'id'>) => {
+    setCalculatorPrefill({ ...data, id: Date.now() });
     setActiveTab('arbitrage');
   };
 
@@ -100,7 +103,7 @@ function BettingPortalShell({ pathname, navigate }: BettingPortalShellProps) {
       case 'arbitrage':
         return <ArbitrageCalculator prefillData={calculatorPrefill} />;
       case 'promo':
-        return <PromoConverter />;
+        return <PromoConverter prefillData={calculatorPrefill} />;
       case 'rollover':
         return <RolloverCalculator />;
       case 'deposits':

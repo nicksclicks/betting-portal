@@ -3,11 +3,13 @@ import { Calculator, TrendingUp, DollarSign, Target } from 'lucide-react';
 import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { OddsInput } from '../shared/OddsInput';
 import { AddBetModal } from '../bets/AddBetModal';
+import { usePersistentState } from '../../hooks/usePersistentState';
 import { calculateHedge, calculateFromHedge, formatCurrency, formatPercent } from '../../utils/odds';
 import { Sportsbook } from '../../constants/sportsbooks';
 
 interface ArbitrageCalculatorProps {
   prefillData?: {
+    id: number;
     teamA: string;
     teamB: string;
     oddsA: number;
@@ -18,28 +20,32 @@ interface ArbitrageCalculatorProps {
 }
 
 export function ArbitrageCalculator({ prefillData }: ArbitrageCalculatorProps) {
-  const [source, setSource] = useState<{ side: 'A' | 'B'; amount: string }>({
-    side: 'A',
-    amount: '1000',
-  });
-  const [teamA, setTeamA] = useState('');
-  const [oddsA, setOddsA] = useState('');
-  const [bookA, setBookA] = useState('');
-  const [teamB, setTeamB] = useState('');
-  const [oddsB, setOddsB] = useState('');
-  const [bookB, setBookB] = useState('');
+  const [source, setSource] = usePersistentState<{ side: 'A' | 'B'; amount: string }>(
+    'arb:source',
+    { side: 'A', amount: '1000' },
+  );
+  const [teamA, setTeamA] = usePersistentState('arb:teamA', '');
+  const [oddsA, setOddsA] = usePersistentState('arb:oddsA', '');
+  const [bookA, setBookA] = usePersistentState('arb:bookA', '');
+  const [teamB, setTeamB] = usePersistentState('arb:teamB', '');
+  const [oddsB, setOddsB] = usePersistentState('arb:oddsB', '');
+  const [bookB, setBookB] = usePersistentState('arb:bookB', '');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [appliedPrefillId, setAppliedPrefillId] = usePersistentState<number | null>(
+    'arb:appliedPrefillId',
+    null,
+  );
 
   useEffect(() => {
-    if (prefillData) {
-      setTeamA(prefillData.teamA);
-      setTeamB(prefillData.teamB);
-      setOddsA(prefillData.oddsA.toString());
-      setOddsB(prefillData.oddsB.toString());
-      setBookA(prefillData.bookA);
-      setBookB(prefillData.bookB);
-    }
-  }, [prefillData]);
+    if (!prefillData || prefillData.id === appliedPrefillId) return;
+    setTeamA(prefillData.teamA);
+    setTeamB(prefillData.teamB);
+    setOddsA(prefillData.oddsA.toString());
+    setOddsB(prefillData.oddsB.toString());
+    setBookA(prefillData.bookA);
+    setBookB(prefillData.bookB);
+    setAppliedPrefillId(prefillData.id);
+  }, [prefillData, appliedPrefillId, setAppliedPrefillId, setBookA, setBookB, setOddsA, setOddsB, setTeamA, setTeamB]);
 
   const result = useMemo(() => {
     const amount = parseFloat(source.amount);

@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { RotateCcw, Target, CheckCircle } from 'lucide-react';
 import { calculateRollover, formatCurrency } from '../../utils/odds';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 export function RolloverCalculator() {
-  const [depositAmount, setDepositAmount] = useState('');
-  const [bonusAmount, setBonusAmount] = useState('');
-  const [rolloverMultiplier, setRolloverMultiplier] = useState('');
-  const [amountWagered, setAmountWagered] = useState('');
+  const [depositAmount, setDepositAmount] = usePersistentState('rollover:depositAmount', '');
+  const [bonusAmount, setBonusAmount] = usePersistentState('rollover:bonusAmount', '');
+  const [rolloverMultiplier, setRolloverMultiplier] = usePersistentState('rollover:multiplier', '');
+  const [amountWagered, setAmountWagered] = usePersistentState('rollover:amountWagered', '');
 
   const result = useMemo(() => {
     const deposit = parseFloat(depositAmount);
