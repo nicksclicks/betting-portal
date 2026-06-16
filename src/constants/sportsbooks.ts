@@ -18,7 +18,6 @@ export const OFFSHORE_SPORTSBOOKS = [
   'KBC Sportsbook',
   'LuckRebel',
   'MyBookie',
-  'PureWage',
   'Skybook',
   'Sportsbetting',
   'Thunderpick',
