@@ -4,7 +4,7 @@ import { SportsbookSelect } from '../shared/SportsbookSelect';
 import { OddsInput } from '../shared/OddsInput';
 import { AddBetModal } from '../bets/AddBetModal';
 import { calculatePromoConversion, formatCurrency, formatOdds } from '../../utils/odds';
-import { ALL_SPORTSBOOKS, Sportsbook } from '../../constants/sportsbooks';
+import { ALL_SPORTSBOOKS, SPORTS, Sportsbook } from '../../constants/sportsbooks';
 import { fetchOddsRows, oddsRowsToApiGames } from '../../lib/oddsFromSupabase';
 import { supabase } from '../../lib/supabase';
 import { usePersistentState } from '../../hooks/usePersistentState';
@@ -14,8 +14,10 @@ interface PromoOpportunity {
   gameName: string;
   freePlayOdds: number;
   freePlayBook: Sportsbook;
+  freePlayTeam: string;
   hedgeOdds: number;
   hedgeBook: Sportsbook;
+  hedgeTeam: string;
   hedgeAmount: number;
   profit: number;
   conversionPercent: number;
@@ -51,7 +53,10 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
   const [hedgeBook, setHedgeBook] = usePersistentState('promo:hedgeBook', '');
 
   const [scanSportsbook, setScanSportsbook] = usePersistentState<string>('promo:scanSportsbook', '');
+  const [scanSport, setScanSport] = usePersistentState<string>('promo:scanSport', '');
   const [scanAmount, setScanAmount] = usePersistentState('promo:scanAmount', '');
+  const [scanMinOdds, setScanMinOdds] = usePersistentState('promo:scanMinOdds', '');
+  const [scanMaxOdds, setScanMaxOdds] = usePersistentState('promo:scanMaxOdds', '');
   const [scanning, setScanning] = useState(false);
   const [opportunities, setOpportunities] = useState<PromoOpportunity[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -132,9 +137,15 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
       const rows = await fetchOddsRows(supabase);
       const games = oddsRowsToApiGames(rows) as ApiGame[];
       const amount = parseFloat(scanAmount);
+      const minOdds = parseFloat(scanMinOdds);
+      const maxOdds = parseFloat(scanMaxOdds);
+      const lowerBound = Number.isFinite(minOdds) ? minOdds : -Infinity;
+      const upperBound = Number.isFinite(maxOdds) ? maxOdds : Infinity;
       const results: PromoOpportunity[] = [];
 
       for (const game of games) {
+        if (scanSport && game.sport !== scanSport) continue;
+
         const moneyLine = game.odds['Money Line'];
         if (!moneyLine) continue;
 
@@ -147,7 +158,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
         ];
 
         for (const { team, odds: freePlayOddsValue } of sides) {
-          if (freePlayOddsValue === null || freePlayOddsValue < 200) continue;
+          if (freePlayOddsValue === null || freePlayOddsValue < lowerBound || freePlayOddsValue > upperBound) continue;
 
           const oppositeTeam = team === 'home' ? 'away' : 'home';
           let bestHedgeOdds: number | null = null;
@@ -171,13 +182,13 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
           if (conversion.conversionPercent >= 50) {
             results.push({
               gameId: game.id,
-              gameName: team === 'home'
-                ? `${game.awayTeam} @ ${game.homeTeam}`
-                : `${game.awayTeam} @ ${game.homeTeam}`,
+              gameName: `${game.awayTeam} @ ${game.homeTeam}`,
               freePlayOdds: freePlayOddsValue,
               freePlayBook: scanSportsbook as Sportsbook,
+              freePlayTeam: team === 'home' ? game.homeTeam : game.awayTeam,
               hedgeOdds: bestHedgeOdds,
               hedgeBook: bestHedgeBook,
+              hedgeTeam: oppositeTeam === 'home' ? game.homeTeam : game.awayTeam,
               hedgeAmount: conversion.hedgeBet,
               profit: conversion.profit,
               conversionPercent: conversion.conversionPercent,
@@ -194,7 +205,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
     } finally {
       setScanning(false);
     }
-  }, [scanSportsbook, scanAmount]);
+  }, [scanSportsbook, scanSport, scanAmount, scanMinOdds, scanMaxOdds]);
 
   const handleOpportunityClick = (opp: PromoOpportunity) => {
     setFreePlayAmount(scanAmount);
@@ -214,7 +225,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
         </p>
       </div>
 
-      <div className="hidden md:grid grid-cols-3 gap-8 max-w-3xl mx-auto">
+      <div className="hidden md:grid grid-cols-3 gap-8 max-w-5xl mx-auto">
         <div className="text-center">
           <div className="feature-icon mx-auto mb-4">
             <Gift className="w-5 h-5" />
@@ -238,7 +249,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="card mb-6 md:mb-8">
           <div className="flex items-center gap-3 mb-4 md:mb-6">
             <div className="feature-icon">
@@ -250,7 +261,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 items-end mb-4 md:mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 items-start mb-4">
             <div>
               <label className="label">Sportsbook</label>
               <select
@@ -263,6 +274,17 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
                   <option key={book} value={book}>{book}</option>
                 ))}
               </select>
+              <label className="label mt-3">Sport</label>
+              <select
+                value={scanSport}
+                onChange={(e) => setScanSport(e.target.value)}
+                className="select-field text-sm md:text-base"
+              >
+                <option value="">All sports</option>
+                {SPORTS.map((sport) => (
+                  <option key={sport} value={sport}>{sport}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="label">Free Play Amount</label>
@@ -273,37 +295,57 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
                 className="input-field font-mono text-sm md:text-base"
                 placeholder="100"
               />
-            </div>
-            <div>
-              <button
-                onClick={scanForOpportunities}
-                disabled={scanning || !scanSportsbook || !scanAmount}
-                className="btn-primary w-full flex items-center justify-center gap-2 text-sm md:text-base"
-              >
-                {scanning ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    Scan
-                  </>
-                )}
-              </button>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <div>
+                  <label className="label">Min Odds</label>
+                  <input
+                    type="number"
+                    value={scanMinOdds}
+                    onChange={(e) => setScanMinOdds(e.target.value)}
+                    className="input-field font-mono text-sm md:text-base"
+                    placeholder="No min"
+                  />
+                </div>
+                <div>
+                  <label className="label">Max Odds</label>
+                  <input
+                    type="number"
+                    value={scanMaxOdds}
+                    onChange={(e) => setScanMaxOdds(e.target.value)}
+                    className="input-field font-mono text-sm md:text-base"
+                    placeholder="No max"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
+          <button
+            onClick={scanForOpportunities}
+            disabled={scanning || !scanSportsbook || !scanAmount}
+            className="btn-primary w-full flex items-center justify-center gap-2 text-sm md:text-base mb-4 md:mb-6"
+          >
+            {scanning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Scanning...
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4" />
+                Scan
+              </>
+            )}
+          </button>
+
           {opportunities.length > 0 && (
             <div className="overflow-x-auto -mx-4 md:mx-0">
-              <table className="w-full min-w-[600px]">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-neutral-800">
                     <th className="text-left py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-neutral-500">Game</th>
-                    <th className="text-right py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-neutral-500">FP Odds</th>
-                    <th className="text-right py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-neutral-500">Hedge</th>
-                    <th className="text-right py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-neutral-500">Amt</th>
+                    <th className="text-left py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-lime-400">1. Free Bet</th>
+                    <th className="text-left py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-amber-400">2. Hedge</th>
                     <th className="text-right py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-neutral-500">Profit</th>
                     <th className="text-right py-2 md:py-3 px-2 md:px-3 text-[10px] md:text-xs font-medium text-neutral-500">Conv %</th>
                   </tr>
@@ -316,19 +358,28 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
                       className="border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors cursor-pointer"
                     >
                       <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-white truncate max-w-[120px] md:max-w-none">{opp.gameName}</td>
-                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono text-lime-400">
-                        {formatOdds(opp.freePlayOdds)}
+                      <td className="py-2 md:py-3 px-2 md:px-3 align-top">
+                        <div className="text-xs md:text-sm text-white font-medium">{opp.freePlayTeam}</div>
+                        <div className="text-[10px] md:text-xs text-neutral-400">
+                          {opp.freePlayBook} · <span className="font-mono text-lime-400">{formatOdds(opp.freePlayOdds)}</span>
+                        </div>
+                        <div className="text-[10px] md:text-xs text-neutral-500">
+                          Stake <span className="font-mono">{formatCurrency(parseFloat(scanAmount) || 0)}</span> free play
+                        </div>
                       </td>
-                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono text-amber-400">
-                        {formatOdds(opp.hedgeOdds)}
+                      <td className="py-2 md:py-3 px-2 md:px-3 align-top">
+                        <div className="text-xs md:text-sm text-white font-medium">{opp.hedgeTeam}</div>
+                        <div className="text-[10px] md:text-xs text-neutral-400">
+                          {opp.hedgeBook} · <span className="font-mono text-amber-400">{formatOdds(opp.hedgeOdds)}</span>
+                        </div>
+                        <div className="text-[10px] md:text-xs text-neutral-500">
+                          Bet <span className="font-mono text-white">{formatCurrency(opp.hedgeAmount)}</span> cash
+                        </div>
                       </td>
-                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono text-white">
-                        {formatCurrency(opp.hedgeAmount)}
-                      </td>
-                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono text-lime-400">
+                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono text-lime-400 align-top">
                         {formatCurrency(opp.profit)}
                       </td>
-                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono">
+                      <td className="py-2 md:py-3 px-2 md:px-3 text-xs md:text-sm text-right font-mono align-top">
                         <span className={opp.conversionPercent >= 70 ? 'text-lime-400' : 'text-amber-400'}>
                           {opp.conversionPercent.toFixed(1)}%
                         </span>
@@ -351,7 +402,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-4 md:mb-6">
           <h2 className="text-base md:text-lg font-semibold text-white">Enter Bet Details</h2>
           <div className="flex gap-2">
@@ -463,7 +514,7 @@ export function PromoConverter({ prefillData }: PromoConverterProps) {
         )}
       </div>
 
-      <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
+      <div className="max-w-5xl mx-auto space-y-4 md:space-y-6">
         <div className="p-4 md:p-5 bg-neutral-950 border border-neutral-800 rounded-xl">
           <div className="text-xs md:text-sm text-neutral-300">
             <p className="font-medium mb-1 md:mb-2">How Free Bets Work</p>

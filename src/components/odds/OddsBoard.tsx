@@ -116,13 +116,13 @@ function transformApiGames(apiGames: OddsApiGame[]): GameOdds[] {
 export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedSports, setSelectedSports] = useState<Sport[]>(() =>
-    readSessionFilter<Sport[]>('selectedSports', [])
+    readSessionFilter<Sport[]>('selectedSports', [...SPORTS])
   );
   const [marketFilter, setMarketFilter] = useState<MarketFilterValue>(() =>
     readSessionFilter<MarketFilterValue>('marketFilter', 'Money Line')
   );
   const [selectedBooks, setSelectedBooks] = useState<Sportsbook[]>(() =>
-    readSessionFilter<Sportsbook[]>('selectedBooks', [...API_SPORTSBOOKS])
+    readSessionFilter<Sportsbook[]>('selectedBooks', API_SPORTSBOOKS.slice(0, 5))
   );
   // Odds-quality filter defaults. 0 in any of these means "no limit" (see passesOddsFilters).
   const DEFAULT_MAX_FAVORITE = 0;
@@ -132,9 +132,9 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   const [maxUnderdog, setMaxUnderdog] = useState(() => readSessionFilter('maxUnderdog', DEFAULT_MAX_UNDERDOG));
   const [maxLossPercent, setMaxLossPercent] = useState(() => readSessionFilter('maxLossPercent', DEFAULT_MAX_LOSS_PERCENT));
   // Display-only: drop sportsbook columns that have no odds for any visible game.
-  const [hideEmptyBooks, setHideEmptyBooks] = useState(() => readSessionFilter('hideEmptyBooks', false));
+  const [hideEmptyBooks, setHideEmptyBooks] = useState(() => readSessionFilter('hideEmptyBooks', true));
   const [dateFilter, setDateFilter] = useState<DateFilter>(() =>
-    readSessionFilter<DateFilter>('dateFilter', 'all')
+    readSessionFilter<DateFilter>('dateFilter', '7d')
   );
   const [customStart, setCustomStart] = useState(() => readSessionFilter('customStart', ''));
   const [customEnd, setCustomEnd] = useState(() => readSessionFilter('customEnd', ''));
