@@ -11,11 +11,18 @@ interface BetEntry {
   id: string;
   betName: string;
   sportsbook: string;
+  /** When true, the book is entered freeform instead of picked from the list. */
+  useCustomBook: boolean;
   odds: string;
   amountStaked: string;
   isBonusBet: boolean;
   isOddsBoost: boolean;
 }
+
+/** Sentinel select value that switches the book field into freeform entry. */
+const CUSTOM_BOOK_OPTION = '__custom__';
+
+const KNOWN_BOOKS = new Set<string>(ALL_SPORTSBOOKS);
 
 interface AddBetModalProps {
   isOpen: boolean;
@@ -28,6 +35,7 @@ const createEmptyBet = (): BetEntry => ({
   id: crypto.randomUUID(),
   betName: '',
   sportsbook: '',
+  useCustomBook: false,
   odds: '',
   amountStaked: '',
   isBonusBet: false,
@@ -66,6 +74,7 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
           ...createEmptyBet(),
           betName: b.betName,
           sportsbook: b.sportsbook,
+          useCustomBook: b.sportsbook !== '' && !KNOWN_BOOKS.has(b.sportsbook),
           odds: b.odds,
           amountStaked: b.amountStaked,
         }))
@@ -80,6 +89,19 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
     );
   };
 
+  const handleBookSelect = (id: string, value: string) => {
+    setSubmitError(null);
+    setBets((prev) =>
+      prev.map((bet) =>
+        bet.id === id
+          ? value === CUSTOM_BOOK_OPTION
+            ? { ...bet, useCustomBook: true, sportsbook: '' }
+            : { ...bet, useCustomBook: false, sportsbook: value }
+          : bet
+      )
+    );
+  };
+
   const addBetRow = () => {
     setBets((prev) => [...prev, createEmptyBet()]);
   };
@@ -91,9 +113,9 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
   };
 
   const handleSubmit = async () => {
-    const filledBets = bets.filter(
-      (bet) => bet.betName && bet.sportsbook && bet.odds && bet.amountStaked
-    );
+    const filledBets = bets
+      .map((bet) => ({ ...bet, sportsbook: bet.sportsbook.trim() }))
+      .filter((bet) => bet.betName && bet.sportsbook && bet.odds && bet.amountStaked);
 
     if (filledBets.length === 0) {
       setSubmitError(
@@ -209,8 +231,8 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
                   <label className="block text-sm text-neutral-400 mb-2">Sportsbook</label>
                   <div className="relative">
                     <select
-                      value={bet.sportsbook}
-                      onChange={(e) => updateBet(bet.id, 'sportsbook', e.target.value)}
+                      value={bet.useCustomBook ? CUSTOM_BOOK_OPTION : bet.sportsbook}
+                      onChange={(e) => handleBookSelect(bet.id, e.target.value)}
                       className="w-full px-4 py-3 bg-neutral-950 border border-neutral-700 rounded-xl text-white appearance-none focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer"
                     >
                       <option value="">Select</option>
@@ -219,9 +241,21 @@ export function AddBetModal({ isOpen, onClose, onSuccess, initialBets }: AddBetM
                           {book}
                         </option>
                       ))}
+                      <option value={CUSTOM_BOOK_OPTION}>Other (custom)…</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
                   </div>
+                  {bet.useCustomBook && (
+                    <input
+                      type="text"
+                      value={bet.sportsbook}
+                      onChange={(e) => updateBet(bet.id, 'sportsbook', e.target.value)}
+                      autoFocus
+                      maxLength={40}
+                      className="mt-2 w-full px-4 py-3 bg-neutral-950 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                      placeholder="Enter book name"
+                    />
+                  )}
                 </div>
 
                 <div>

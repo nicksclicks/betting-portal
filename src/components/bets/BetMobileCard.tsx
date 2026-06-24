@@ -4,8 +4,8 @@ import { formatCurrency } from '../../utils/odds';
 
 interface BetMobileCardProps {
   bet: Bet;
-  isGrouped: boolean;
-  isFirstInGroup: boolean;
+  /** Left-rail color for the bet's group (empty/undefined for ungrouped single bets). */
+  groupAccentClass?: string;
   formatOdds: (odds: number) => string;
   formatDate: (dateStr: string) => string;
   getStatusClass: (status: Bet['status']) => string;
@@ -17,8 +17,7 @@ interface BetMobileCardProps {
 
 export function BetMobileCard({
   bet,
-  isGrouped,
-  isFirstInGroup,
+  groupAccentClass,
   formatOdds,
   formatDate,
   getStatusClass,
@@ -27,12 +26,7 @@ export function BetMobileCard({
   onDelete,
   highlighted = false,
 }: BetMobileCardProps) {
-  const groupAccent =
-    isGrouped && isFirstInGroup
-      ? 'border-l-4 border-l-cyan-500'
-      : isGrouped && !isFirstInGroup
-        ? 'border-l-4 border-l-cyan-500/40'
-        : '';
+  const groupAccent = groupAccentClass ? `border-l-4 ${groupAccentClass}` : '';
 
   return (
     <article
@@ -56,9 +50,6 @@ export function BetMobileCard({
               </span>
             )}
           </div>
-          {isGrouped && isFirstInGroup && (
-            <p className="text-[10px] text-cyan-400 mt-1">Grouped bet</p>
-          )}
         </div>
         <span className={`shrink-0 text-[10px] capitalize ${getStatusClass(bet.status)}`}>{bet.status}</span>
       </div>

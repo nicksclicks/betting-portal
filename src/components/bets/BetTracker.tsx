@@ -107,6 +107,15 @@ export function BetTracker() {
     return acc;
   }, {} as Record<string, Bet[]>);
 
+  // Every bet group gets a colored left rail that's consistent across the group's
+  // rows and alternates bright/dim between consecutive groups. Single bets count as
+  // their own group, so the rail alternates on every bet/group down the list.
+  const groupAccentByKey: Record<string, string> = {};
+  Object.keys(groupedBets).forEach((key, index) => {
+    groupAccentByKey[key] =
+      index % 2 === 0 ? 'border-l-cyan-500' : 'border-l-cyan-400/40';
+  });
+
   const stats = {
     total: bets.length,
     pending: bets.filter((b) => b.status === 'pending').length,
@@ -238,13 +247,12 @@ export function BetTracker() {
           ) : (
             <>
               <div className="md:hidden">
-                {Object.entries(groupedBets).map(([, groupBets]) =>
-                  groupBets.map((bet, idx) => (
+                {Object.entries(groupedBets).map(([key, groupBets]) =>
+                  groupBets.map((bet) => (
                     <BetMobileCard
                       key={bet.id}
                       bet={bet}
-                      isGrouped={groupBets.length > 1}
-                      isFirstInGroup={idx === 0}
+                      groupAccentClass={groupAccentByKey[key]}
                       formatOdds={formatOdds}
                       formatDate={formatDate}
                       getStatusClass={getStatusClass}
@@ -269,13 +277,13 @@ export function BetTracker() {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(groupedBets).map(([, groupBets]) =>
-                      groupBets.map((bet, idx) => (
+                    {Object.entries(groupedBets).map(([key, groupBets]) =>
+                      groupBets.map((bet) => (
                         <tr
                           key={bet.id}
                           className={`border-b border-neutral-800/50 hover:bg-neutral-900/50 transition-colors ${
-                            groupBets.length > 1 && idx === 0 ? 'border-l-2 border-l-cyan-500' : ''
-                          } ${groupBets.length > 1 && idx > 0 ? 'border-l-2 border-l-cyan-500/50' : ''}`}
+                            groupAccentByKey[key] ? `border-l-2 ${groupAccentByKey[key]}` : ''
+                          }`}
                         >
                           <td className="py-3 md:py-4 px-3 md:px-4">
                             <div className="flex items-center gap-1 md:gap-2">
@@ -291,9 +299,6 @@ export function BetTracker() {
                                 </span>
                               )}
                             </div>
-                            {groupBets.length > 1 && idx === 0 && (
-                              <div className="text-[8px] md:text-[10px] text-cyan-400 mt-0.5">Grouped</div>
-                            )}
                           </td>
                           <td className="py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm text-neutral-400">{bet.sportsbook}</td>
                           <td className="py-3 md:py-4 px-2 md:px-4 text-right font-mono text-white text-xs md:text-sm">

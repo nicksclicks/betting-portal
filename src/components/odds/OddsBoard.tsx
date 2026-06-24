@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Activity, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Activity, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, X } from 'lucide-react';
 import {
   SPORTS,
   MARKET_TYPES,
@@ -138,6 +138,10 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   );
   const [customStart, setCustomStart] = useState(() => readSessionFilter('customStart', ''));
   const [customEnd, setCustomEnd] = useState(() => readSessionFilter('customEnd', ''));
+  // Live team search: a pure client-side trim of already-loaded games. Deliberately kept out
+  // of currentFilterKey and session persistence so it never marks filters dirty / prompts a
+  // Refresh, and clears on reload.
+  const [teamSearch, setTeamSearch] = useState('');
   const [games, setGames] = useState<GameOdds[]>(() => readCachedGames() ?? []);
   // Only show the spinner when we have nothing cached to show.
   const [loading, setLoading] = useState(() => readCachedGames() === null);
@@ -407,6 +411,18 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
       filtered = step('Sport', filtered.filter((g) => selectedSports.includes(g.game.sport)));
     }
 
+    const teamQuery = teamSearch.trim().toLowerCase();
+    if (teamQuery) {
+      filtered = step(
+        'Team search',
+        filtered.filter(
+          (g) =>
+            g.game.homeTeam.toLowerCase().includes(teamQuery) ||
+            g.game.awayTeam.toLowerCase().includes(teamQuery)
+        )
+      );
+    }
+
     filtered = step(
       'Market lines',
       filtered.filter((g) =>
@@ -468,6 +484,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   }, [
     gamesWithMarketBests,
     selectedSports,
+    teamSearch,
     marketFilter,
     sortKey,
     sortDir,
@@ -643,6 +660,27 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
+          </div>
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+            <input
+              type="text"
+              value={teamSearch}
+              onChange={(e) => setTeamSearch(e.target.value)}
+              placeholder="Search teams…"
+              aria-label="Search teams"
+              className="input-field text-sm md:text-base pl-9 pr-9"
+            />
+            {teamSearch && (
+              <button
+                type="button"
+                onClick={() => setTeamSearch('')}
+                aria-label="Clear team search"
+                className="touch-manipulation absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-neutral-500 hover:text-neutral-300 active:text-neutral-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <div className="text-xs md:text-sm text-neutral-500 text-center px-2 space-y-0.5">
             <p>

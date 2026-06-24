@@ -1,0 +1,42 @@
+Sportsbook,In badges,OddsAPI,OddsNET,Covered by any,Notes
+FanDuel,Yes,Yes,Yes,Yes,
+DraftKings,Yes,Yes,Yes,Yes,
+theScore,No,No,No,No,
+BetMGM,Yes,Yes,Yes,Yes,
+BetRivers,Yes,Yes,Yes,Yes,
+Fanatics,No,Yes,No,Yes,app only
+Caesars,Yes,Yes,Yes,Yes,OddsAPI key williamhill_us
+Bet365,No,No,Yes,Yes,OddsNET only
+Desert Diamond,No,No,No,No,
+Bally Bet,No,Yes,No,Yes,app only
+Betway,No,Yes,UK only,Yes,OddsNET betway is UK-region; OddsAPI betway is usable
+HardRock,No,Yes,Yes,Yes,
+Fliff,Yes,Yes,No,Yes,
+Rebet,Yes,Yes,No,Yes,
+Novig,Yes,Yes,No,Yes,
+ProphetX,Yes,Yes,No,Yes,
+Bovada,Yes,Yes,No,Yes,
+LuckRebel,Yes,No,No,No,Sheet: Use Bovada lines
+Everygame,Yes,Yes,No,Yes,
+Thunderpick,Yes,No,No,No,Sheet: Use BetUS lines
+Betwhale,Yes,No,No,No,
+PureWage,No,No,No,No,Removed from badges commit 05dbfc7; Sheet: Use Jazz lines
+BetOnline,Yes,Yes,No,Yes,
+BetUS,Yes,Yes,No,Yes,
+Skybook,Yes,No,No,No,Sheet: Use Betmania lines
+Sportsbetting,Yes,No,No,No,
+Betmania,Yes,No,No,No,
+Betphoenix,Yes,No,No,No,Sheet: Use Betmania lines
+YouWager,Yes,No,No,No,
+KBCsportsbook,Yes,No,No,No,Sheet: Use BetOnline odds
+BetNow,Yes,No,No,No,Sheet: Use BetUS lines
+Xbet,Yes,No,No,No,Sheet: Use YouWager odds
+BTL,Yes,No,No,No,Sheet: Use Jazz lines
+BetAnything,Yes,Yes,No,Yes,
+MyBookie,Yes,Yes,No,Yes,Sheet: Use YouWager odds
+BUSR,Yes,No,No,No,Sheet: Use YouWager odds
+Justbet,Yes,No,No,No,OddsNET justbet is an AU book (not this one); Sheet: Use Bookmaker lines
+Bet105,Yes,No,No,No,
+Bookmaker,Yes,No,No,No,
+Heritage,Yes,No,No,No,
+Wager Attack,Yes,No,No,No,Sheet: Use BetUS lines
