@@ -147,7 +147,7 @@ function BettingPortalShell({ pathname, navigate }: BettingPortalShellProps) {
 }
 
 function App() {
-  const { loading, isAuthenticated, profile, isLocalMock } = useAuth();
+  const { loading, profileLoading, isAuthenticated, profile, isLocalMock } = useAuth();
   const { pathname, navigate } = useBrowserPath();
 
   if (loading) {
@@ -170,6 +170,13 @@ function App() {
   }
 
   if (!profile && !isLocalMock) {
+    if (profileLoading) {
+      return (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-lgm-glow">
+          <Loader2 className="w-10 h-10 animate-spin text-neutral-500" aria-label="Loading" />
+        </div>
+      );
+    }
     return <ProfileMissingScreen />;
   }
 

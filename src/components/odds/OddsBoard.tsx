@@ -4,8 +4,9 @@ import {
   SPORTS,
   MARKET_TYPES,
   MARKET_TYPE_SHORT_LABELS,
-  ALL_SPORTSBOOKS,
   API_SPORTSBOOKS,
+  SPORTSBOOKS_BY_AVAILABILITY,
+  isSportsbookAvailable,
   Sport,
   MarketType,
   Sportsbook,
@@ -122,7 +123,10 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
     readSessionFilter<MarketFilterValue>('marketFilter', 'Money Line')
   );
   const [selectedBooks, setSelectedBooks] = useState<Sportsbook[]>(() =>
-    readSessionFilter<Sportsbook[]>('selectedBooks', API_SPORTSBOOKS.slice(0, 5))
+    // Drop any books persisted before they lost API coverage so they can't stay selected.
+    readSessionFilter<Sportsbook[]>('selectedBooks', API_SPORTSBOOKS.slice(0, 5)).filter(
+      isSportsbookAvailable
+    )
   );
   // Odds-quality filter defaults. 0 in any of these means "no limit" (see passesOddsFilters).
   const DEFAULT_MAX_FAVORITE = 0;
@@ -583,16 +587,18 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
         ];
 
   const toggleBook = (book: Sportsbook) => {
+    // Books without API odds coverage are temporarily unavailable and cannot be selected.
+    if (!isSportsbookAvailable(book)) return;
     setSelectedBooks((prev) =>
       prev.includes(book) ? prev.filter((b) => b !== book) : [...prev, book]
     );
   };
 
   const toggleAllSportsbooks = () => {
-    if (selectedBooks.length === ALL_SPORTSBOOKS.length) {
+    if (selectedBooks.length === API_SPORTSBOOKS.length) {
       setSelectedBooks([]);
     } else {
-      setSelectedBooks([...ALL_SPORTSBOOKS]);
+      setSelectedBooks([...API_SPORTSBOOKS]);
     }
   };
 
@@ -611,7 +617,7 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
   };
 
   const allSportsSelected = selectedSports.length === SPORTS.length;
-  const allSportsbooksSelected = selectedBooks.length === ALL_SPORTSBOOKS.length;
+  const allSportsbooksSelected = selectedBooks.length === API_SPORTSBOOKS.length;
 
   return (
     <div className="space-y-8 md:space-y-12">
@@ -744,20 +750,37 @@ export function OddsBoard({ onOddsClick }: OddsBoardProps) {
                 >
                   All Sportsbooks
                 </button>
-                {ALL_SPORTSBOOKS.map((book) => (
-                  <button
-                    type="button"
-                    key={book}
-                    onClick={() => toggleBook(book)}
-                    className={`touch-manipulation inline-flex items-center justify-center min-h-[44px] px-3 py-2.5 rounded-full text-xs font-medium transition-colors border ${
-                      selectedBooks.includes(book)
-                        ? 'bg-lime-500/10 border-lime-500/30 text-lime-400 active:opacity-90'
-                        : 'bg-neutral-900 border-neutral-800 text-neutral-500 hover:border-neutral-700 active:bg-neutral-800 active:border-neutral-600'
-                    }`}
-                  >
-                    {book}
-                  </button>
-                ))}
+                {SPORTSBOOKS_BY_AVAILABILITY.map((book) => {
+                  const available = isSportsbookAvailable(book);
+                  if (!available) {
+                    return (
+                      <button
+                        type="button"
+                        key={book}
+                        disabled
+                        aria-disabled="true"
+                        title="Temporarily Unavailable"
+                        className="touch-manipulation inline-flex items-center justify-center min-h-[44px] px-3 py-2.5 rounded-full text-xs font-medium border bg-neutral-950 border-neutral-900 text-neutral-600 opacity-40 cursor-not-allowed"
+                      >
+                        {book}
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      type="button"
+                      key={book}
+                      onClick={() => toggleBook(book)}
+                      className={`touch-manipulation inline-flex items-center justify-center min-h-[44px] px-3 py-2.5 rounded-full text-xs font-medium transition-colors border ${
+                        selectedBooks.includes(book)
+                          ? 'bg-lime-500/10 border-lime-500/30 text-lime-400 active:opacity-90'
+                          : 'bg-neutral-900 border-neutral-800 text-neutral-500 hover:border-neutral-700 active:bg-neutral-800 active:border-neutral-600'
+                      }`}
+                    >
+                      {book}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

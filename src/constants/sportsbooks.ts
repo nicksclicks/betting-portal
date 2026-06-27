@@ -73,6 +73,18 @@ export const API_SPORTSBOOKS = [
   ...new Set(Object.values(ODDS_API_BOOKMAKER_MAP)),
 ] as Sportsbook[];
 
+/** Books with live API odds coverage. Others are "Temporarily Unavailable" in odds UI. */
+export const AVAILABLE_SPORTSBOOK_SET = new Set<Sportsbook>(API_SPORTSBOOKS);
+
+export const isSportsbookAvailable = (book: Sportsbook): boolean =>
+  AVAILABLE_SPORTSBOOK_SET.has(book);
+
+/** ALL_SPORTSBOOKS reordered: API-covered books first, unavailable books last. */
+export const SPORTSBOOKS_BY_AVAILABILITY: Sportsbook[] = [
+  ...ALL_SPORTSBOOKS.filter(isSportsbookAvailable),
+  ...ALL_SPORTSBOOKS.filter((book) => !isSportsbookAvailable(book)),
+];
+
 export const SPORTS = [
   'Football',
   'Basketball',

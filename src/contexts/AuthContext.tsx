@@ -34,6 +34,7 @@ interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  profileLoading: boolean;
   isLocalMock: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -51,14 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const loadProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-    if (error || !data) {
-      setProfile(null);
-      return;
+    setProfileLoading(true);
+    try {
+      const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+      if (error || !data) {
+        setProfile(null);
+        return;
+      }
+      setProfile(data as Profile);
+    } finally {
+      setProfileLoading(false);
     }
-    setProfile(data as Profile);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -161,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
+      profileLoading,
       isLocalMock: isLocalMockMode,
       isAuthenticated: isLocalMockMode || !!session,
       isAdmin: profile?.role === 'admin',
@@ -171,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, signIn, signUp, sendPasswordResetEmail, updatePassword, signOut, refreshProfile]
+    [session, profile, loading, profileLoading, signIn, signUp, sendPasswordResetEmail, updatePassword, signOut, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
